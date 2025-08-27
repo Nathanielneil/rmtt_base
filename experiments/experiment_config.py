@@ -14,7 +14,7 @@
 
 # 基础实验参数
 EXPERIMENT_CYCLES = 3           # 实验周期数量（修改这里改变周期数）
-TARGET_HEIGHT = 150             # 目标高度 (cm) - 相对地面绝对高度1.5m
+TARGET_HEIGHT = 100             # 目标高度 (cm) - 相对地面绝对高度1.0m
 HOVER_DURATION = 1              # 悬停时间 (秒) - 优化电池使用
 DESCENT_SPEED = 0.2             # 下降速度 (m/s) - 20cm/s
 FINAL_HEIGHT = 30               # 最终高度 (cm) - 相对地面绝对高度0.3m
@@ -36,7 +36,7 @@ EXPERIMENTER_NAME = ""          # 可选：实验员姓名
 
 # 实验描述（自动生成）
 EXPERIMENT_DESCRIPTION = f"""
-高度控制实验 - {EXPERIMENT_CYCLES}个周期 (优化版本)
+高度控制实验 - {EXPERIMENT_CYCLES}个周期 (1.0m高度版本)
 - 目标高度: {TARGET_HEIGHT}cm (相对地面绝对高度{TARGET_HEIGHT/100}m)
 - 悬停时间: {HOVER_DURATION}秒 (优化电池使用) 
 - 下降速度: {DESCENT_SPEED}m/s ({int(DESCENT_SPEED*100)}cm/s)
