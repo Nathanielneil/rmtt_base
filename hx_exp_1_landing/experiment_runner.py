@@ -282,8 +282,8 @@ class ExperimentRunner:
                     # 下降: 0.0-0.5 映射到 -100-0
                     throttle_cmd = int(np.clip((thrust - 0.5) * 200, -100, 0))
                 
-                # 保证最小推力，防止坠毁
-                if throttle_cmd < 5 and thrust > 0.1:
+                # 保证最小推力仅适用于上升情况，防止坠毁
+                if throttle_cmd < 5 and thrust > 0.5:  # 仅在上升时保护
                     throttle_cmd = max(5, throttle_cmd)
                 
                 self.tello.send_rc_control(roll_cmd, pitch_cmd, throttle_cmd, yaw_cmd)

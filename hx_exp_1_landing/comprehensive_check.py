@@ -81,9 +81,9 @@ def check_parameter_consistency():
         # 检查RMTT质量参数
         expected_mass = 0.087
         mass_params = [
-            runner.control_params.get("ameso_gain/quad_mass"),
-            runner.control_params.get("pid_gain/quad_mass"), 
-            runner.control_params.get("ude_gain/quad_mass")
+            runner.experiment_params.get("ameso_gain/quad_mass"),
+            runner.experiment_params.get("pid_gain/quad_mass"), 
+            runner.experiment_params.get("ude_gain/quad_mass")
         ]
         
         for i, mass in enumerate(mass_params):
@@ -118,8 +118,8 @@ def check_thrust_conversion():
         
         for thrust, expected_throttle, description in test_cases:
             # 创建ControlOutput并测试转换
-            control_output = ControlOutput(0.0, 0.0, 0.0, 0.0, thrust)
-            _, _, throttle_cmd, _ = control_output.to_tello_rc()
+            control_output = ControlOutput(0.0, 0.0, 0.0, thrust)
+            _, _, throttle_cmd, _ = control_output.as_rc_command()
             
             if abs(throttle_cmd - expected_throttle) > 5:  # 允许5%误差
                 print(f"✗ 推力转换错误: {thrust} -> {throttle_cmd} (期望: ~{expected_throttle}) - {description}")
