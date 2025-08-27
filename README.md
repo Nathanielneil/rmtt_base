@@ -8,6 +8,7 @@
 - 实时视频流显示和录制
 - 图像拍摄和保存
 - **高频飞行数据记录（50Hz）**
+- **自动化实验脚本系统**
 - 智能安全机制（电池监控、连接监控、自动降落）
 - 详细的日志记录
 - 模块化设计便于扩展
@@ -148,6 +149,10 @@ rmtt/
 │   ├── video_recording.py # 视频录制演示
 │   ├── flight_data_recording.py # 数据记录演示
 │   └── data_format_test.py # 数据格式测试
+├── experiments/
+│   ├── altitude_experiment.py # 高度控制实验
+│   ├── experiment_config.py # 实验参数配置
+│   └── README.md         # 实验使用说明
 └── logs/                  # 日志文件
 ```
 
@@ -211,6 +216,45 @@ record_data stop                  # 停止记录
 - **MATLAB**: readtable, plot
 - **Excel**: 直接导入分析
 - **R**: read.csv, ggplot2
+
+## 自动化实验系统
+
+系统提供完整的自动化实验脚本，用于科研和测试：
+
+### 高度控制实验
+
+**实验设计:**
+- 无人机起飞至1.5m高度
+- 悬停3秒钟
+- 以0.1m/s速度缓慢降落到0.1m高度
+- 支持多周期重复实验
+
+**快速开始:**
+```bash
+cd experiments
+python altitude_experiment.py
+```
+
+**自定义参数:**
+```python
+# 编辑 experiment_config.py
+EXPERIMENT_CYCLES = 5      # 修改实验周期数
+TARGET_HEIGHT = 200        # 修改目标高度(cm)
+DESCENT_SPEED = 0.05       # 修改下降速度(m/s)
+```
+
+**实验特性:**
+- ✅ 自动数据记录（50Hz采样）
+- ✅ 精确速度控制（±0.01m/s）
+- ✅ 安全检查机制
+- ✅ 自动生成实验报告
+- ✅ 实时状态监控
+
+**输出文件:**
+- **数据文件**: `data/flight_records/YYYYMMDD_HHMMSS_altitude_control_experiment.csv`
+- **实验报告**: `logs/altitude_experiment_report_YYYYMMDD_HHMMSS.txt`
+
+更多实验详情请查看 `experiments/README.md`
 
 ## 故障排除
 
