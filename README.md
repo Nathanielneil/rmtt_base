@@ -7,6 +7,7 @@
 - 完整的飞行控制（起飞、降落、移动、旋转、翻滚）
 - 实时视频流显示和录制
 - 图像拍摄和保存
+- **高频飞行数据记录（50Hz）**
 - 智能安全机制（电池监控、连接监控、自动降落）
 - 详细的日志记录
 - 模块化设计便于扩展
@@ -82,6 +83,12 @@ python main.py --auto-connect
 - `record stop` - 停止录制视频
 - `photo` - 拍照（需要先启动视频流）
 
+#### 飞行数据记录
+- `record_data start` - 开始记录飞行数据（50Hz频率）
+- `record_data stop` - 停止记录飞行数据
+- `record_data status` - 查看记录状态
+- 注：起飞时自动开始记录，降落时自动停止
+
 #### 信息查看
 - `status` - 显示无人机状态
 - `media` - 显示媒体文件统计
@@ -91,16 +98,16 @@ python main.py --auto-connect
 ## 示例飞行序列
 
 ```
-Tello> takeoff          # 起飞
+Tello> takeoff          # 起飞 (自动开始数据记录)
 Tello> stream start     # 启动视频流  
 Tello> up 100          # 上升100cm
 Tello> cw 360          # 360度旋转
 Tello> photo           # 拍照
-Tello> record start    # 开始录制
+Tello> record start    # 开始录制视频
 Tello> forward 100     # 前进100cm
 Tello> back 100        # 后退100cm
-Tello> record stop     # 停止录制
-Tello> land            # 降落
+Tello> record stop     # 停止录制视频
+Tello> land            # 降落 (自动停止数据记录)
 ```
 
 ## 安全机制
@@ -127,13 +134,20 @@ rmtt/
 ├── media/
 │   ├── video_stream.py    # 视频流处理
 │   └── media_saver.py     # 媒体文件管理
+├── data/
+│   ├── flight_data_recorder.py # 飞行数据记录器
+│   ├── images/           # 图片保存
+│   ├── videos/           # 视频保存
+│   └── flight_records/   # 飞行数据CSV文件
 ├── utils/
 │   ├── logger.py          # 日志系统
 │   ├── safety.py          # 安全机制
 │   └── exceptions.py      # 异常定义
-├── data/                  # 数据存储目录
-│   ├── images/           # 图片保存
-│   └── videos/           # 视频保存
+├── examples/
+│   ├── basic_flight.py   # 基础飞行演示
+│   ├── video_recording.py # 视频录制演示
+│   ├── flight_data_recording.py # 数据记录演示
+│   └── data_format_test.py # 数据格式测试
 └── logs/                  # 日志文件
 ```
 
@@ -142,13 +156,61 @@ rmtt/
 主要配置参数在 `config/settings.py` 中：
 
 ```python
-TELLO_IP = "192.168.10.1"           # 无人机IP
-WIFI_SSID = "RMTT-A93874"           # 无人机热点名称
-BATTERY_WARNING_THRESHOLD = 20       # 电池警告阈值
-BATTERY_CRITICAL_THRESHOLD = 10      # 电池危急阈值
-FLIGHT_ALTITUDE_LIMIT = 500         # 飞行高度限制(cm)
-SPEED_LIMIT = 100                   # 移动距离限制(cm)
+TELLO_IP = "192.168.10.1"                    # 无人机IP
+WIFI_SSID = "RMTT-A93874"                    # 无人机热点名称
+BATTERY_WARNING_THRESHOLD = 20               # 电池警告阈值
+BATTERY_CRITICAL_THRESHOLD = 10              # 电池危急阈值
+FLIGHT_ALTITUDE_LIMIT = 500                  # 飞行高度限制(cm)
+SPEED_LIMIT = 100                            # 移动距离限制(cm)
+
+# 飞行数据记录配置
+ENABLE_FLIGHT_DATA_RECORDING = True          # 启用数据记录
+FLIGHT_DATA_RECORDING_INTERVAL = 0.02        # 记录间隔(50Hz)
+FLIGHT_DATA_CSV_ENCODING = 'utf-8-sig'       # CSV编码
 ```
+
+## 飞行数据记录
+
+系统支持高频飞行数据记录，以CSV格式存储无人机的关键飞行参数：
+
+### 记录的数据字段
+
+| 字段名 | 描述 | 单位 |
+|--------|------|------|
+| `timestamp` | 绝对时间戳 | ISO格式 |
+| `relative_time` | 相对飞行开始时间 | 秒 |
+| `x_cm`, `y_cm`, `z_cm` | 相对位置坐标 | cm |
+| `pitch_deg`, `roll_deg`, `yaw_deg` | 俯仰、翻滚、偏航角 | 度 |
+| `vgx_cm_s`, `vgy_cm_s`, `vgz_cm_s` | 速度分量 | cm/s |
+| `agx_0001g`, `agy_0001g`, `agz_0001g` | 加速度分量 | 0.001g |
+
+### 使用方式
+
+**自动记录（推荐）：**
+- 执行 `takeoff` 时自动开始记录
+- 执行 `land` 时自动停止记录
+- 文件自动保存到 `data/flight_records/` 目录
+
+**手动控制：**
+```
+record_data start [session_name]  # 开始记录（可选命名）
+record_data status                # 查看记录状态
+record_data stop                  # 停止记录
+```
+
+**文件格式：**
+```
+20250827_143025_drone_data.csv           # 默认格式
+20250827_143025_session_name_drone_data.csv  # 带会话名
+```
+
+### 数据分析建议
+
+生成的CSV文件可以使用以下工具进行分析：
+- **Python**: pandas, matplotlib, numpy
+- **MATLAB**: readtable, plot
+- **Excel**: 直接导入分析
+- **R**: read.csv, ggplot2
 
 ## 故障排除
 

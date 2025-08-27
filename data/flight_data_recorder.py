@@ -19,35 +19,22 @@ class FlightDataRecorder:
         self.record_start_time = None
         self.data_points_recorded = 0
         
-        # CSV字段定义
+        # CSV字段定义 - 专注核心飞行数据
         self.csv_headers = [
-            'timestamp',           # 时间戳
-            'relative_time',       # 相对开始时间(秒)
-            'battery_percent',     # 电池电量百分比
-            'height_cm',           # 高度(cm)
-            'temperature_low',     # 最低温度
-            'temperature_high',    # 最高温度
-            'temperature_avg',     # 平均温度
-            'pitch_deg',          # 俯仰角(度)
-            'roll_deg',           # 翻滚角(度) 
-            'yaw_deg',            # 偏航角(度)
-            'velocity_x',         # X轴速度
-            'velocity_y',         # Y轴速度
-            'velocity_z',         # Z轴速度
-            'acceleration_x',     # X轴加速度
-            'acceleration_y',     # Y轴加速度
-            'acceleration_z',     # Z轴加速度
-            'tof_distance_cm',    # TOF距离传感器(cm)
-            'barometer_cm',       # 气压计高度(cm)
-            'motor_time',         # 电机运行时间
-            'position_x',         # X轴位置(仅EDU版本支持)
-            'position_y',         # Y轴位置(仅EDU版本支持)
-            'position_z',         # Z轴位置(仅EDU版本支持)
-            'mission_pad_id',     # 任务垫ID(仅EDU版本支持)
-            'wifi_signal',        # WiFi信号强度
-            'flight_mode',        # 飞行模式
-            'command_executed',   # 最近执行的命令
-            'error_state'         # 错误状态
+            'timestamp',          # 时间戳
+            'relative_time',      # 相对开始时间(秒)
+            'x_cm',              # X轴位置坐标(cm)
+            'y_cm',              # Y轴位置坐标(cm)
+            'z_cm',              # Z轴位置坐标(cm)
+            'pitch_deg',         # 俯仰角(度)
+            'roll_deg',          # 翻滚角(度)
+            'yaw_deg',           # 偏航角(度)
+            'vgx_cm_s',          # X轴速度分量(cm/s)
+            'vgy_cm_s',          # Y轴速度分量(cm/s)  
+            'vgz_cm_s',          # Z轴速度分量(cm/s)
+            'agx_0001g',         # X轴加速度分量(0.001g)
+            'agy_0001g',         # Y轴加速度分量(0.001g)
+            'agz_0001g',         # Z轴加速度分量(0.001g)
         ]
     
     def start_recording(self, session_name=None):
@@ -154,35 +141,26 @@ class FlightDataRecorder:
             tello = self.connection_manager.get_tello()
             current_time = time.time()
             
-            # 基础数据收集
+            # 获取完整状态字符串
+            state = tello.get_current_state()
+            
             data_row = []
             
-            # 时间戳
+            # 时间戳数据
             data_row.append(datetime.now().isoformat())
             data_row.append(current_time - self.record_start_time)
             
-            # 电池和基础传感器数据
+            # 位置坐标 (x, y, z) - 从状态字符串解析
             try:
-                data_row.append(tello.get_battery())
-            except:
-                data_row.append(None)
-            
-            try:
-                data_row.append(tello.get_height())
-            except:
-                data_row.append(None)
-            
-            # 温度数据
-            try:
-                temp_low = getattr(tello, 'get_lowest_temperature', lambda: None)()
-                temp_high = getattr(tello, 'get_highest_temperature', lambda: None)()
-                temp_avg = tello.get_temperature()
-                
-                data_row.extend([temp_low, temp_high, temp_avg])
+                if state and isinstance(state, str):
+                    position_data = self._parse_state_data(state, ['x', 'y', 'z'])
+                    data_row.extend(position_data)
+                else:
+                    data_row.extend([None, None, None])
             except:
                 data_row.extend([None, None, None])
             
-            # 姿态数据
+            # 姿态角度 (pitch, roll, yaw)
             try:
                 data_row.append(tello.get_pitch())
                 data_row.append(tello.get_roll())
@@ -190,9 +168,8 @@ class FlightDataRecorder:
             except:
                 data_row.extend([None, None, None])
             
-            # 速度数据 (通过状态字符串解析)
+            # 速度分量 (vgx, vgy, vgz) - 从状态字符串解析
             try:
-                state = tello.get_current_state()
                 if state and isinstance(state, str):
                     velocity_data = self._parse_state_data(state, ['vgx', 'vgy', 'vgz'])
                     data_row.extend(velocity_data)
@@ -201,54 +178,15 @@ class FlightDataRecorder:
             except:
                 data_row.extend([None, None, None])
             
-            # 加速度数据
+            # 加速度分量 (agx, agy, agz) - 从状态字符串解析
             try:
-                data_row.append(tello.get_acceleration_x())
-                data_row.append(tello.get_acceleration_y())
-                data_row.append(tello.get_acceleration_z())
+                if state and isinstance(state, str):
+                    acceleration_data = self._parse_state_data(state, ['agx', 'agy', 'agz'])
+                    data_row.extend(acceleration_data)
+                else:
+                    data_row.extend([None, None, None])
             except:
                 data_row.extend([None, None, None])
-            
-            # 距离和气压数据
-            try:
-                data_row.append(tello.get_distance_tof())
-            except:
-                data_row.append(None)
-            
-            try:
-                data_row.append(tello.get_barometer())
-            except:
-                data_row.append(None)
-            
-            # 电机时间
-            try:
-                state = tello.get_current_state()
-                if state and isinstance(state, str):
-                    motor_time = self._parse_state_data(state, ['time'])
-                    data_row.append(motor_time[0] if motor_time else None)
-                else:
-                    data_row.append(None)
-            except:
-                data_row.append(None)
-            
-            # 位置数据 (EDU版本)
-            try:
-                state = tello.get_current_state()
-                if state and isinstance(state, str):
-                    position_data = self._parse_state_data(state, ['x', 'y', 'z'])
-                    mission_pad = self._parse_state_data(state, ['mid'])
-                    data_row.extend(position_data)
-                    data_row.append(mission_pad[0] if mission_pad else None)
-                else:
-                    data_row.extend([None, None, None, None])
-            except:
-                data_row.extend([None, None, None, None])
-            
-            # WiFi信号和飞行模式 (模拟数据)
-            data_row.append(None)  # WiFi信号强度
-            data_row.append('AUTO')  # 飞行模式
-            data_row.append('')  # 最近执行的命令
-            data_row.append('')  # 错误状态
             
             return data_row
             
@@ -278,27 +216,10 @@ class FlightDataRecorder:
         return results
     
     def add_command_log(self, command, success=True, error_msg=""):
-        if self.recording and self.csv_writer:
-            try:
-                # 添加一个特殊的命令记录行
-                current_time = time.time()
-                command_row = [
-                    datetime.now().isoformat(),
-                    current_time - self.record_start_time if self.record_start_time else 0
-                ]
-                
-                # 填充其他字段为None
-                command_row.extend([None] * (len(self.csv_headers) - 4))
-                
-                # 设置命令相关字段
-                command_row[-3] = command  # 最近执行的命令
-                command_row[-1] = error_msg if not success else ""  # 错误状态
-                
-                self.csv_writer.writerow(command_row)
-                self.csv_file.flush()
-                
-            except Exception as e:
-                self.logger.error(f"记录命令日志失败: {e}")
+        """添加命令执行日志 - 暂时禁用以保持数据纯净性"""
+        # 暂时禁用命令日志记录，保持数据文件的纯净性
+        # 所有命令记录将通过程序日志文件记录
+        pass
     
     def get_recording_status(self):
         if self.recording and self.record_start_time:
