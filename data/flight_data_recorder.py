@@ -185,68 +185,81 @@ class FlightDataRecorder:
             baro_height = 0
             
             try:
-                # 使用原始UDP状态数据而非get_current_state()
+                # 获取ESP32状态数据 - 支持字典和字符串格式
                 state = None
+                state_dict = None
+                
                 try:
-                    # 直接访问Tello的状态数据
+                    # 尝试获取状态数据
                     if hasattr(tello, 'get_current_state'):
-                        state = tello.get_current_state()
+                        raw_state = tello.get_current_state()
+                        
+                        if isinstance(raw_state, dict):
+                            # 状态是字典格式（RoboMaster TT常见情况）
+                            state_dict = raw_state
+                            # 构建状态字符串用于传统解析
+                            state_parts = []
+                            for key, value in raw_state.items():
+                                state_parts.append(f"{key}:{value}")
+                            state = ";".join(state_parts) + ";"
+                        elif isinstance(raw_state, str):
+                            # 状态是字符串格式
+                            state = raw_state
+                        else:
+                            state = None
+                            
                     elif hasattr(tello, 'state'):
-                        # 尝试访问内部状态
+                        # 备用：直接访问内部状态
                         state_dict = tello.state
-                        if state_dict:
-                            # 构建状态字符串
+                        if state_dict and isinstance(state_dict, dict):
                             state_parts = []
                             for key, value in state_dict.items():
                                 state_parts.append(f"{key}:{value}")
                             state = ";".join(state_parts) + ";"
-                except:
+                except Exception as state_error:
+                    if self.data_points_recorded < 2:
+                        self.logger.debug(f"获取状态数据失败: {state_error}")
                     state = None
+                    state_dict = None
                 
-                if state and isinstance(state, str) and len(state) > 20:
-                    # 仅在第一次记录时显示ESP32状态字符串示例
+                # 处理状态数据（优先使用字典，备用字符串解析）
+                if state_dict and isinstance(state_dict, dict):
+                    # 仅在第一次记录时显示状态数据示例
                     if self.data_points_recorded == 0:
-                        self.logger.info(f"RoboMaster TT ESP32状态字符串: {state[:200]}...")
+                        self.logger.info(f"RoboMaster TT状态数据: {state_dict}")
                     
-                    # 解析姿态角度 (pitch, roll, yaw)
-                    attitude_data = self._parse_state_data(state, ['pitch', 'roll', 'yaw'])
-                    pitch_val = attitude_data[0] if attitude_data[0] is not None else 0.0
-                    roll_val = attitude_data[1] if attitude_data[1] is not None else 0.0
-                    yaw_val = attitude_data[2] if attitude_data[2] is not None else 0.0
+                    # 直接从字典解析姿态角度
+                    pitch_val = float(state_dict.get('pitch', 0))
+                    roll_val = float(state_dict.get('roll', 0))  
+                    yaw_val = float(state_dict.get('yaw', 0))
                     data_row.extend([pitch_val, roll_val, yaw_val])
                     
-                    # 解析传感器数据 - RoboMaster TT特有的红外定高和气压计
-                    sensor_data = self._parse_state_data(state, ['tof', 'baro'])
-                    tof_distance = sensor_data[0] if sensor_data[0] is not None else 0
-                    baro_height = sensor_data[1] if sensor_data[1] is not None else 0
+                    # 直接从字典解析传感器数据
+                    tof_distance = int(state_dict.get('tof', 0))
+                    baro_height = float(state_dict.get('baro', 0))
                     data_row.extend([tof_distance, baro_height])
                     
                     # 计算TOF与气压计高度差
                     height_diff = abs(tof_distance - baro_height) if (tof_distance > 0 and baro_height > 0) else 0
                     data_row.append(height_diff)
                     
-                    # 解析ESP32提供的速度数据
-                    velocity_data = self._parse_state_data(state, ['vgx', 'vgy', 'vgz'])
-                    vgx = velocity_data[0] if velocity_data[0] is not None else 0.0
-                    vgy = velocity_data[1] if velocity_data[1] is not None else 0.0
-                    vgz = velocity_data[2] if velocity_data[2] is not None else 0.0
+                    # 直接从字典解析速度数据
+                    vgx = float(state_dict.get('vgx', 0))
+                    vgy = float(state_dict.get('vgy', 0))
+                    vgz = float(state_dict.get('vgz', 0))
                     data_row.extend([vgx, vgy, vgz])
                     
-                    # 解析ESP32提供的加速度数据
-                    acceleration_data = self._parse_state_data(state, ['agx', 'agy', 'agz'])
-                    agx = acceleration_data[0] if acceleration_data[0] is not None else 0
-                    agy = acceleration_data[1] if acceleration_data[1] is not None else 0
-                    agz = acceleration_data[2] if acceleration_data[2] is not None else 0
+                    # 直接从字典解析加速度数据
+                    agx = float(state_dict.get('agx', 0))
+                    agy = float(state_dict.get('agy', 0))
+                    agz = float(state_dict.get('agz', 0))
                     data_row.extend([agx, agy, agz])
                     
-                    # 尝试解析WiFi信号质量（如果存在）
-                    wifi_data = self._parse_state_data(state, ['wifi_snr', 'wifi', 'snr'])
-                    wifi_snr = -1
-                    for val in wifi_data:
-                        if val is not None and val != -1:
-                            wifi_snr = val
-                            break
-                    data_row.append(wifi_snr)
+                    # WiFi信号强度（可能不存在）
+                    wifi_snr = state_dict.get('wifi_snr', state_dict.get('snr', -1))
+                    if wifi_snr is None:
+                        wifi_snr = -1
+                    data_row.append(int(wifi_snr))
                     
                 else:
                     # 状态字符串无效或为空时使用API调用备用方案

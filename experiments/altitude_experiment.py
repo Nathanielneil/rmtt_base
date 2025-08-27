@@ -183,43 +183,85 @@ class AltitudeExperiment:
             
             self.logger.info(f"优化下降控制: 总距离={height_diff}cm, 速度={descent_speed_cm_s}cm/s ({DESCENT_SPEED}m/s), 预计时间={total_descent_time:.1f}秒")
             
-            # 直接下降到目标高度，避免分步停顿
-            # 使用Tello的速度控制命令实现连续下降
+            # 优化下降方案：使用精确的速度控制
             try:
-                # 方案1: 使用rc命令实现连续下降
                 tello = self.connection_manager.get_tello()
                 
-                self.logger.info(f"开始连续下降 {height_diff}cm...")
-                
-                # 计算rc命令的下降速度参数 (Tello rc命令范围: -100到100)
-                # 负值表示下降，速度映射到-100到0范围
-                rc_speed = min(-10, -int(descent_speed_cm_s * 0.5))  # 保守映射，确保不会太快
-                
-                # 开始连续下降
-                start_time = time.time()
-                tello.send_rc_control(0, 0, rc_speed, 0)  # left_right, forward_backward, up_down, yaw
-                
-                # 监控下降过程
-                while time.time() - start_time < total_descent_time:
-                    current_height = self.get_current_height()
-                    if current_height is not None and current_height <= FINAL_HEIGHT + 5:
-                        # 接近目标高度，停止下降
-                        break
-                    time.sleep(0.1)  # 短暂检查间隔
-                
-                # 停止下降
-                tello.send_rc_control(0, 0, 0, 0)
-                time.sleep(0.5)  # 等待稳定
-                
-            except Exception as rc_error:
-                self.logger.warning(f"RC连续下降失败，使用备用方案: {rc_error}")
-                
-                # 方案2: 单次大距离下降
-                self.logger.info(f"使用单次下降命令: 下降 {height_diff}cm")
+                # 方案1: 使用speed命令设置飞行速度，然后执行移动
+                self.logger.info(f"设置飞行速度为 {int(descent_speed_cm_s)}cm/s")
+                try:
+                    # 设置飞行速度 (10-100 cm/s)
+                    speed_setting = max(10, min(100, int(descent_speed_cm_s)))
+                    tello.set_speed(speed_setting)
+                    time.sleep(0.2)  # 等待设置生效
+                    
+                    self.logger.info(f"开始单次下降 {height_diff}cm，速度 {speed_setting}cm/s")
+                    
+                    # 执行单次下降命令
+                    self.controller.move_down(height_diff)
+                    
+                    # 等待下降完成（基于计算时间 + 缓冲）
+                    wait_time = (height_diff / speed_setting) + 2  # 额外2秒缓冲
+                    self.logger.info(f"等待下降完成，预计时间: {wait_time:.1f}秒")
+                    time.sleep(wait_time)
+                    
+                except Exception as speed_error:
+                    self.logger.warning(f"速度控制方案失败: {speed_error}, 尝试RC控制")
+                    
+                    # 方案2: 使用RC命令的更强下降控制
+                    self.logger.info(f"使用RC连续下降 {height_diff}cm...")
+                    
+                    # 计算更强的下降速度 (提高RC速度参数)
+                    rc_speed = -30  # 提高下降速度，原来是-10
+                    
+                    # 开始连续下降
+                    start_time = time.time()
+                    tello.send_rc_control(0, 0, rc_speed, 0)
+                    
+                    # 实时监控下降过程
+                    last_height = self.get_current_height()
+                    stable_count = 0
+                    
+                    while time.time() - start_time < total_descent_time + 3:  # 额外3秒
+                        current_height = self.get_current_height()
+                        
+                        if current_height is not None:
+                            # 检查是否接近目标高度
+                            if current_height <= FINAL_HEIGHT + 10:
+                                self.logger.info(f"接近目标高度: {current_height}cm")
+                                break
+                                
+                            # 检查高度是否还在变化
+                            if last_height is not None and abs(current_height - last_height) < 2:
+                                stable_count += 1
+                                if stable_count > 10:  # 1秒没有明显下降
+                                    self.logger.warning(f"高度稳定在 {current_height}cm，可能遇到阻力")
+                                    break
+                            else:
+                                stable_count = 0
+                                
+                            last_height = current_height
+                            
+                        time.sleep(0.1)  # 检查间隔
+                    
+                    # 停止下降
+                    tello.send_rc_control(0, 0, 0, 0)
+                    time.sleep(0.5)
+                    
+                    # 如果仍未到达目标，尝试最后一次调整
+                    final_check_height = self.get_current_height()
+                    if final_check_height is not None and final_check_height > FINAL_HEIGHT + 15:
+                        remaining = final_check_height - FINAL_HEIGHT
+                        self.logger.info(f"最终调整: 还需下降 {remaining}cm")
+                        if remaining > 0 and remaining < 100:
+                            self.controller.move_down(int(remaining))
+                            time.sleep(2)
+                            
+            except Exception as e:
+                self.logger.error(f"所有下降方案都失败: {e}")
+                # 紧急下降
+                self.logger.info("执行紧急下降...")
                 self.controller.move_down(height_diff)
-                
-                # 等待下降完成
-                time.sleep(total_descent_time + 1)  # 额外1秒缓冲
             
             # 验证最终高度
             final_height = self.get_current_height()
@@ -237,11 +279,34 @@ class AltitudeExperiment:
             self.controller.move_down(TARGET_HEIGHT - FINAL_HEIGHT)
     
     def get_current_height(self):
-        """获取当前高度"""
+        """获取当前高度 - 优先使用TOF传感器厘米级精度"""
         try:
-            status = self.controller.get_status()
-            if status:
-                return status.get('height')
+            tello = self.connection_manager.get_tello()
+            
+            # 优先使用TOF传感器（更精确的厘米级数据）
+            try:
+                tof_height = tello.get_distance_tof()
+                if tof_height is not None and tof_height > 0:
+                    return tof_height
+            except:
+                pass
+            
+            # 备用方案：使用API高度
+            try:
+                api_height = tello.get_height()
+                if api_height is not None:
+                    return api_height
+            except:
+                pass
+                
+            # 最后备用：从状态数据获取
+            try:
+                status = self.controller.get_status()
+                if status and 'height' in status:
+                    return status['height']
+            except:
+                pass
+                
             return None
         except:
             return None
