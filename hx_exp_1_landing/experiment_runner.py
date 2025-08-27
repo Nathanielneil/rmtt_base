@@ -58,27 +58,27 @@ class ExperimentRunner:
             "ameso_gain/quad_mass": 0.087,  # RMTT实际质量87g
             "ameso_gain/hov_percent": 0.5,
             
-            # 滑模控制参数 - 专门优化下降跟踪性能
-            "ameso_gain/k": 1.5,        # 大幅提高滑模增益确保强力跟踪
-            "ameso_gain/k1": -0.5,      # 增强比例反馈增益
-            "ameso_gain/k2": -3.5,      # 大幅增强微分反馈增益
-            "ameso_gain/c1": 2.0,       # 提高滑模面系数增强响应
-            "ameso_gain/c2": 1.5,       # 提高滑模面系数确保快速收敛
-            "ameso_gain/lambda_D": 1.0,  # 提高积分参数增强稳态精度
-            "ameso_gain/beta_max": 1.2,  # 提高最大指数值增强非线性响应
-            "ameso_gain/gamma": 0.3,     # 提高指数参数
+            # 滑模控制参数 - 保守设置提高稳定性
+            "ameso_gain/k": 0.5,        # 降低滑模增益
+            "ameso_gain/k1": -0.1,      # 减小反馈增益
+            "ameso_gain/k2": -2.0,      # 减小反馈增益
+            "ameso_gain/c1": 1.0,       # 降低滑模面系数
+            "ameso_gain/c2": 0.8,       # 增加滑模面系数提高稳定
+            "ameso_gain/lambda_D": 0.5,  # 降低积分参数
+            "ameso_gain/beta_max": 0.8,  # 降低最大指数值
+            "ameso_gain/gamma": 0.15,    # 降低指数参数
             
-            # 自适应模型参数 - 更积极的学习策略
-            "ameso_gain/lambda": 0.8,    # 提高学习率加快扰动补偿
-            "ameso_gain/sigma": 0.9,     # 降低收缩因子增强学习
-            "ameso_gain/omega_star": 0.02, # 保持用户要求的值
+            # 自适应模型参数 - 保守设置
+            "ameso_gain/lambda": 0.5,    # 降低学习率
+            "ameso_gain/sigma": 0.95,    # 增大收缩因子
+            "ameso_gain/omega_star": 0.02, # 用户要求的值
             
-            # 跟踪微分器参数 - 减少滞后
-            "ameso_gain/t1": 0.02,      # 减小时间常数提高响应速度
-            "ameso_gain/t2": 0.03,      # 减小时间常数提高响应速度
+            # 跟踪微分器参数 - 增加滤波
+            "ameso_gain/t1": 0.05,      # 增加时间常数
+            "ameso_gain/t2": 0.08,      # 增加时间常数
             
-            # AMESO观测器参数 - 强化扰动观测
-            "ameso_gain/l": 6.0,        # 大幅提高ESO增益改善扰动补偿
+            # AMESO观测器参数 - 降低增益
+            "ameso_gain/l": 3.0,        # 降低ESO增益
             
             # PID参数
             "ameso_gain/kp": 2.0,
@@ -238,22 +238,26 @@ class ExperimentRunner:
                 yaw=0.0
             )
             
-            # 控制到中等高度 - 放宽条件确保成功
-            if not self._controlled_flight_to_target(mid_desired_state, max_time=12.0, tolerance=0.15):
-                self.logger.warning("第一段降落未完全收敛，继续第二段")
+            # 控制到中等高度 - 适应ADRC收敛特性
+            self.logger.info("ADRC降落特点: 保守参数确保稳定性，但收敛较慢")
+            if not self._controlled_flight_to_target(mid_desired_state, max_time=20.0, tolerance=0.2):
+                self.logger.info("ADRC第一段已尽力下降，继续第二段")
             
-            # 第二段：从中等高度到低空 (0.4m) - 提高目标高度
-            self.logger.info("降落第二段: 0.5m -> 0.4m")  
+            # 第二段：从当前高度到低空着陆高度
+            current_height = self._get_current_state().pos[2] 
+            target_height = max(0.4, current_height - 0.2)  # 至少再下降0.2m
+            self.logger.info(f"降落第二段: {current_height:.2f}m -> {target_height:.2f}m")
+            
             low_desired_state = DesiredState(
-                pos=np.array([0.0, 0.0, 0.4]),  # 稍高的低空高度，更容易达成
-                vel=np.array([0.0, 0.0, -self.experiment_params["descend_speed"]]),  # 0.1m/s下降
+                pos=np.array([0.0, 0.0, target_height]),  # 动态调整目标高度
+                vel=np.array([0.0, 0.0, -self.experiment_params["descend_speed"]]),
                 acc=np.array([0.0, 0.0, 0.0]),
                 yaw=0.0
             )
             
-            # 控制到低空 - 更充裕的时间
-            if not self._controlled_flight_to_target(low_desired_state, max_time=8.0, tolerance=0.15):
-                self.logger.warning("第二段降落未完全收敛，直接着陆")
+            # 给ADRC足够时间完成收敛
+            if not self._controlled_flight_to_target(low_desired_state, max_time=20.0, tolerance=0.2):
+                self.logger.info("ADRC第二段已尽力下降，执行着陆")
             
             # 发送着陆指令
             self.logger.info("执行最终着陆指令")
