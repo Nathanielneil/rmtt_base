@@ -58,27 +58,27 @@ class ExperimentRunner:
             "ameso_gain/quad_mass": 0.087,  # RMTT实际质量87g
             "ameso_gain/hov_percent": 0.5,
             
-            # 滑模控制参数
-            "ameso_gain/k": 0.8,
-            "ameso_gain/k1": -0.15,
-            "ameso_gain/k2": -3.0,
-            "ameso_gain/c1": 1.5,
-            "ameso_gain/c2": 0.6,
-            "ameso_gain/lambda_D": 1.0,
-            "ameso_gain/beta_max": 1.0,
-            "ameso_gain/gamma": 0.2,
+            # 滑模控制参数 - 保守设置提高稳定性
+            "ameso_gain/k": 0.5,        # 降低滑模增益
+            "ameso_gain/k1": -0.1,      # 减小反馈增益
+            "ameso_gain/k2": -2.0,      # 减小反馈增益
+            "ameso_gain/c1": 1.0,       # 降低滑模面系数
+            "ameso_gain/c2": 0.8,       # 增加滑模面系数提高稳定
+            "ameso_gain/lambda_D": 0.5,  # 降低积分参数
+            "ameso_gain/beta_max": 0.8,  # 降低最大指数值
+            "ameso_gain/gamma": 0.15,    # 降低指数参数
             
-            # 自适应模型参数
-            "ameso_gain/lambda": 0.8,
-            "ameso_gain/sigma": 0.9,
-            "ameso_gain/omega_star": 0.02,
+            # 自适应模型参数 - 保守设置
+            "ameso_gain/lambda": 0.5,    # 降低学习率
+            "ameso_gain/sigma": 0.95,    # 增大收缩因子
+            "ameso_gain/omega_star": 0.01, # 降低阈值参数
             
-            # 跟踪微分器参数
-            "ameso_gain/t1": 0.02,
-            "ameso_gain/t2": 0.04,
+            # 跟踪微分器参数 - 增加滤波
+            "ameso_gain/t1": 0.05,      # 增加时间常数
+            "ameso_gain/t2": 0.08,      # 增加时间常数
             
-            # AMESO观测器参数
-            "ameso_gain/l": 5.0,
+            # AMESO观测器参数 - 降低增益
+            "ameso_gain/l": 3.0,        # 降低ESO增益
             
             # PID参数
             "ameso_gain/kp": 2.0,

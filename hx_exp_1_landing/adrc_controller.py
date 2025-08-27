@@ -217,6 +217,16 @@ class ADRC_Controller:
         # 7. 计算z轴总控制律 - 对应C++第541-542行
         u_z = u_n + u_f + u_c
         
+        # RMTT稳定性增强: 限制Z轴控制量变化率
+        max_u_z = 3.0 * self.quad_mass * 9.8  # 最大3倍重力
+        min_u_z = 0.2 * self.quad_mass * 9.8  # 最小0.2倍重力
+        u_z = max(min_u_z, min(u_z, max_u_z))
+        
+        # 数值稳定性检查
+        if math.isnan(u_z) or math.isinf(u_z):
+            self.logger.error("ADRC: Invalid u_z value, using hover thrust")
+            u_z = self.quad_mass * 9.8
+        
         # 8. AMESO观测器 - 对应C++第544-545行
         self.update_ameso(dt, u_z, f_z_hat)
         
@@ -264,12 +274,17 @@ class ADRC_Controller:
         u_x = des_acc[0] * self.quad_mass
         u_y = des_acc[1] * self.quad_mass
         
-        # 关键安全检查 - 对应C++第597-604行
-        if abs(u_z) < 0.01:  # 防止除零
-            self.logger.error("ADRC: Critical thrust too small! Emergency fallback.")
+        # 关键安全检查 - 调整为RMTT适配阈值
+        if abs(u_z) < 0.001:  # 降低阈值防止误触发
+            self.logger.warning("ADRC: Z-thrust very small (%.6f), using hover thrust", u_z)
             u_z = 0.5 * self.quad_mass * 9.8  # 紧急回落到悬停推力
             u_x = 0
             u_y = 0
+        
+        # 额外安全检查: Z推力不能为负值
+        if u_z < 0:
+            self.logger.warning("ADRC: Negative Z-thrust detected (%.6f), correcting", u_z)
+            u_z = 0.1 * self.quad_mass * 9.8  # 最小推力
         
         # 计算总拉力和姿态角 - 对应C++第606-614行
         u_total = math.sqrt(u_x * u_x + u_y * u_y + u_z * u_z)
@@ -299,14 +314,14 @@ class ADRC_Controller:
             full_thrust = self.quad_mass * 9.8 / self.hov_percent
             self.u_att_[3] = Thrust_des / full_thrust
         
-        # 油门限制 - 对应C++第663-673行
-        if self.u_att_[3] < 0.3:
-            self.u_att_[3] = 0.3
-            self.logger.warning("throttle too low")
+        # 油门限制 - 调整为RMTT适配范围
+        if self.u_att_[3] < 0.1:  # 最小推力10%
+            self.u_att_[3] = 0.1
+            self.logger.warning("throttle too low: %.3f -> 0.1", self.u_att_[3])
         
-        if self.u_att_[3] > 0.7:
-            self.u_att_[3] = 0.7
-            self.logger.warning("throttle too high")
+        if self.u_att_[3] > 0.9:  # 最大推力90% 
+            self.u_att_[3] = 0.9
+            self.logger.warning("throttle too high: %.3f -> 0.9", self.u_att_[3])
         
         return self.u_att_
     
@@ -366,6 +381,11 @@ class ADRC_Controller:
         # 数值积分 - 对应C++第740-741行
         self.epsilon_bar1 += epsilon_bar1_dot * dt
         self.epsilon_bar2 += epsilon_bar2_dot * dt
+        
+        # RMTT稳定性增强: 限制跟踪微分器状态
+        max_track = 2.0  # 最大跟踪误差2米
+        self.epsilon_bar1 = max(-max_track, min(self.epsilon_bar1, max_track))
+        self.epsilon_bar2 = max(-2*max_track, min(self.epsilon_bar2, 2*max_track))
     
     def update_nominal_system(self, dt: float, u_n: float):
         """更新标称系统 - 严格对应C++函数第745-757行"""
@@ -396,6 +416,12 @@ class ADRC_Controller:
         self.epsilon_hat1 += epsilon_hat1_dot * dt
         self.epsilon_hat2 += epsilon_hat2_dot * dt
         self.epsilon_hat3 += epsilon_hat3_dot * dt
+        
+        # RMTT稳定性增强: 限制AMESO观测器状态
+        max_obs = 5.0  # 最大观测值
+        self.epsilon_hat1 = max(-max_obs, min(self.epsilon_hat1, max_obs))
+        self.epsilon_hat2 = max(-max_obs, min(self.epsilon_hat2, max_obs))
+        self.epsilon_hat3 = max(-max_obs, min(self.epsilon_hat3, max_obs))
     
     def compute_variable_exponent(self, epsilon: float) -> float:
         """计算可变指数 - 严格对应C++函数第782-797行"""
