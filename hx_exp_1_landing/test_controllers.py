@@ -6,6 +6,12 @@
 
 import numpy as np
 import time
+import sys
+from pathlib import Path
+
+# Add the current directory to Python path
+sys.path.insert(0, str(Path(__file__).parent))
+
 from data_structures import DesiredState, CurrentState
 from pid_controller import PID_Controller
 from ude_controller import UDE_Controller

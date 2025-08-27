@@ -8,7 +8,7 @@ import numpy as np
 import time
 import logging
 from typing import Dict, Any
-from .data_structures import DesiredState, CurrentState, ControlOutput, sign, sat, R
+from data_structures import DesiredState, CurrentState, ControlOutput, sign, sat, R
 
 
 class UDE_Controller:

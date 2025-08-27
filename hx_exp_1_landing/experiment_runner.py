@@ -19,10 +19,10 @@ from core.connection import ConnectionManager
 from utils.logger import Logger
 from data.flight_data_recorder import FlightDataRecorder
 
-from .data_structures import DesiredState, CurrentState, ControlOutput, R
-from .pid_controller import PID_Controller
-from .ude_controller import UDE_Controller  
-from .adrc_controller import ADRC_Controller
+from data_structures import DesiredState, CurrentState, ControlOutput, R
+from pid_controller import PID_Controller
+from ude_controller import UDE_Controller  
+from adrc_controller import ADRC_Controller
 
 
 class ControllerType(Enum):
@@ -297,16 +297,11 @@ class ExperimentRunner:
                 # 计算控制指令
                 control_output = self.controller.update(control_dt)
                 
-                # 发送控制指令
-                if isinstance(control_output, np.ndarray):
-                    # ADRC返回numpy数组
-                    roll_cmd = int(np.clip(control_output[0] * 180/np.pi * 2.5, -100, 100))
-                    pitch_cmd = int(np.clip(control_output[1] * 180/np.pi * 2.5, -100, 100))
-                    yaw_cmd = int(np.clip(control_output[2] * 180/np.pi * 2.5, -100, 100))
-                    throttle_cmd = int(np.clip((control_output[3] - 0.5) * 200, -100, 100))
-                else:
-                    # PID/UDE返回ControlOutput对象
-                    roll_cmd, pitch_cmd, throttle_cmd, yaw_cmd = control_output.as_rc_command()
+                # 发送控制指令 - 所有控制器都返回numpy数组 [roll, pitch, yaw, thrust]
+                roll_cmd = int(np.clip(control_output[0] * 180/np.pi * 2.5, -100, 100))
+                pitch_cmd = int(np.clip(control_output[1] * 180/np.pi * 2.5, -100, 100))
+                yaw_cmd = int(np.clip(control_output[2] * 180/np.pi * 2.5, -100, 100))
+                throttle_cmd = int(np.clip((control_output[3] - 0.5) * 200, -100, 100))
                 
                 self.tello.send_rc_control(roll_cmd, pitch_cmd, throttle_cmd, yaw_cmd)
                 

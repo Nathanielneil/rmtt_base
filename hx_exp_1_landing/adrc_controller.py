@@ -9,7 +9,7 @@ import time
 import logging
 import math
 from typing import Dict, Any, List
-from .data_structures import DesiredState, CurrentState, ControlOutput, sign, sat, R
+from data_structures import DesiredState, CurrentState, ControlOutput, sign, sat, R
 
 
 class ADRC_Controller:
@@ -105,7 +105,7 @@ class ADRC_Controller:
         # 自适应模型参数，来自论文表1 - 对应C++第404-407行
         self.lambda_adapt = params.get("ameso_gain/lambda", 0.8)
         self.sigma_adapt = params.get("ameso_gain/sigma", 0.9)
-        self.omega_star = params.get("ameso_gain/omega_star", 0.02)
+        self.omega_star = params.get("ameso_gain/omega_star", 1.0)
         
         # 跟踪微分器参数，来自论文表1 - 对应C++第409-411行
         self.t1 = params.get("ameso_gain/t1", 0.02)
