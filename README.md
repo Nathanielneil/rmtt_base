@@ -1,0 +1,191 @@
+# RMTT - Robomaster Tello Talent 无人机控制系统
+
+基于Python的大疆Tello无人机控制系统，支持飞行控制、视频流处理、图像采集等功能。
+
+## 功能特性
+
+- 完整的飞行控制（起飞、降落、移动、旋转、翻滚）
+- 实时视频流显示和录制
+- 图像拍摄和保存
+- 智能安全机制（电池监控、连接监控、自动降落）
+- 详细的日志记录
+- 模块化设计便于扩展
+- 命令行交互界面
+
+## 系统要求
+
+- Python 3.11
+- Windows 10/11 (主要测试平台)
+- WiFi连接到无人机热点 RMTT-A93874
+
+## 安装说明
+
+### 1. 创建Conda环境
+
+```bash
+# 创建并激活环境
+conda env create -f environment.yml
+conda activate rmtt
+```
+
+### 2. 或使用pip安装
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. 连接到无人机
+
+1. 打开无人机电源
+2. 连接到WiFi热点 `RMTT-A93874`
+3. 等待连接稳定
+
+## 使用方法
+
+### 启动程序
+
+```bash
+python main.py
+```
+
+### 自动连接模式
+
+```bash
+python main.py --auto-connect
+```
+
+### 基本命令
+
+连接后，可使用以下命令：
+
+#### 飞行控制
+- `takeoff` - 起飞
+- `land` - 降落
+- `emergency` - 紧急停止
+- `hover [时长]` - 悬停（默认3秒）
+
+#### 移动控制
+- `up [距离]` - 上升（默认50cm）
+- `down [距离]` - 下降（默认50cm）
+- `left [距离]` - 左移（默认50cm）
+- `right [距离]` - 右移（默认50cm）
+- `forward [距离]` - 前进（默认50cm）
+- `back [距离]` - 后退（默认50cm）
+- `cw [角度]` - 顺时针旋转（默认90度）
+- `ccw [角度]` - 逆时针旋转（默认90度）
+- `flip [方向]` - 翻滚（f/b/l/r，默认前翻）
+
+#### 视频和拍照
+- `stream start` - 启动视频流
+- `stream stop` - 停止视频流
+- `record start` - 开始录制视频
+- `record stop` - 停止录制视频
+- `photo` - 拍照（需要先启动视频流）
+
+#### 信息查看
+- `status` - 显示无人机状态
+- `media` - 显示媒体文件统计
+- `help` - 显示帮助信息
+- `quit` - 退出程序
+
+## 示例飞行序列
+
+```
+Tello> takeoff          # 起飞
+Tello> stream start     # 启动视频流  
+Tello> up 100          # 上升100cm
+Tello> cw 360          # 360度旋转
+Tello> photo           # 拍照
+Tello> record start    # 开始录制
+Tello> forward 100     # 前进100cm
+Tello> back 100        # 后退100cm
+Tello> record stop     # 停止录制
+Tello> land            # 降落
+```
+
+## 安全机制
+
+系统内置多重安全保护：
+
+- **电池监控**: 电池电量低于20%时警告，低于10%时自动降落
+- **连接监控**: WiFi连接断开时自动触发紧急降落
+- **飞行限制**: 限制最大移动距离和飞行高度
+- **命令验证**: 执行飞行命令前进行安全检查
+
+## 文件目录结构
+
+```
+rmtt/
+├── main.py                 # 主程序入口
+├── requirements.txt        # pip依赖
+├── environment.yml         # conda环境配置
+├── config/
+│   └── settings.py        # 配置参数
+├── core/
+│   ├── connection.py      # 连接管理
+│   └── tello_controller.py # 飞行控制
+├── media/
+│   ├── video_stream.py    # 视频流处理
+│   └── media_saver.py     # 媒体文件管理
+├── utils/
+│   ├── logger.py          # 日志系统
+│   ├── safety.py          # 安全机制
+│   └── exceptions.py      # 异常定义
+├── data/                  # 数据存储目录
+│   ├── images/           # 图片保存
+│   └── videos/           # 视频保存
+└── logs/                  # 日志文件
+```
+
+## 配置说明
+
+主要配置参数在 `config/settings.py` 中：
+
+```python
+TELLO_IP = "192.168.10.1"           # 无人机IP
+WIFI_SSID = "RMTT-A93874"           # 无人机热点名称
+BATTERY_WARNING_THRESHOLD = 20       # 电池警告阈值
+BATTERY_CRITICAL_THRESHOLD = 10      # 电池危急阈值
+FLIGHT_ALTITUDE_LIMIT = 500         # 飞行高度限制(cm)
+SPEED_LIMIT = 100                   # 移动距离限制(cm)
+```
+
+## 故障排除
+
+### 连接问题
+1. 确认已连接到无人机WiFi热点
+2. 检查无人机是否开机
+3. 尝试重新连接WiFi
+
+### 视频流问题
+1. 确保无人机固件是最新版本
+2. 重启无人机和程序
+3. 检查网络连接质量
+
+### 命令不响应
+1. 检查无人机电池电量
+2. 确认连接状态正常
+3. 查看日志文件获取详细错误信息
+
+## 日志文件
+
+所有操作都会记录在 `logs/` 目录下，日志文件按时间命名：
+- 飞行操作日志
+- 错误信息记录
+- 安全事件记录
+
+## 注意事项
+
+1. **安全第一**: 在空旷区域飞行，远离人群和障碍物
+2. **电池管理**: 及时关注电池电量，避免强制降落
+3. **网络稳定**: 保持笔记本与无人机的WiFi连接稳定
+4. **紧急停止**: 遇到危险情况立即使用 `emergency` 命令
+5. **定期维护**: 定期清理媒体文件释放存储空间
+
+## 许可证
+
+MIT License
+
+## 贡献
+
+欢迎提交Issue和Pull Request来改进这个项目。

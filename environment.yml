@@ -1,0 +1,15 @@
+name: rmtt
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - opencv
+  - numpy
+  - pillow
+  - pip:
+    - djitellopy>=2.5.0
+    - av
+    - psutil
+    - colorama

@@ -1,0 +1,7 @@
+djitellopy>=2.5.0
+opencv-python
+numpy
+pillow
+av
+psutil
+colorama
