@@ -1,24 +1,38 @@
-# RMTT - Robomaster Tello Talent 无人机控制系统
+# RMTT - RoboMaster TT创造力套装控制系统
 
-基于Python的大疆Tello无人机控制系统，支持飞行控制、视频流处理、图像采集等功能。
+专为RoboMaster TT创造力套装设计的Python控制系统，充分利用ESP32-D2WD主控和双重定高传感器的优势，支持高精度飞行控制、实时数据采集、视频流处理等功能。
 
-## 功能特性
+## RoboMaster TT硬件特性
 
-- 完整的飞行控制（起飞、降落、移动、旋转、翻滚）
-- 实时视频流显示和录制
-- 图像拍摄和保存
-- **高频飞行数据记录（50Hz）**
-- **自动化实验脚本系统**
-- 智能安全机制（电池监控、连接监控、自动降落）
-- 详细的日志记录
-- 模块化设计便于扩展
-- 命令行交互界面
+### ESP32-D2WD主控优势
+- **双核处理器**: 240MHz Xtensa LX6，支持高频数据处理
+- **集成WiFi**: 2.4GHz 802.11b/g/n，实时连接质量监控
+- **实时计算**: 边缘计算三轴速度和加速度数据
+
+### 双重定高传感器系统
+- **红外TOF距离传感器**: 0-8m范围，近距离厘米级精度
+- **气压计高度传感器**: 绝对高度参考，不受地面材质影响
+- **传感器融合**: 智能切换和数据对比，确保定高精度
+
+## 软件功能特性
+
+- ✅ **精确飞行控制**: 充分利用双重定高系统
+- ✅ **高频数据采集**: 50Hz采样，18列完整传感器数据
+- ✅ **传感器融合分析**: TOF vs 气压计对比，地面检测
+- ✅ **实时视频流**: 显示、录制、拍照功能
+- ✅ **专业数据分析**: 传感器性能分析和图表生成
+- ✅ **自动化实验**: 高度控制等科研实验脚本
+- ✅ **智能安全机制**: 电池监控、连接监控、自动降落
+- ✅ **ESP32性能监控**: WiFi信号强度、数据完整性检查
+- ✅ **模块化设计**: 便于扩展和二次开发
 
 ## 系统要求
 
-- Python 3.11
-- Windows 10/11 (主要测试平台)
-- WiFi连接到无人机热点 RMTT-A93874
+- **Python**: 3.11+
+- **操作系统**: Windows 10/11, Linux, macOS
+- **硬件**: RoboMaster TT创造力套装（ESP32-D2WD主控）
+- **网络**: WiFi连接到无人机热点 RMTT-A93874
+- **可选**: matplotlib, pandas（用于数据分析）
 
 ## 安装说明
 
@@ -136,10 +150,11 @@ rmtt/
 │   ├── video_stream.py    # 视频流处理
 │   └── media_saver.py     # 媒体文件管理
 ├── data/
-│   ├── flight_data_recorder.py # 飞行数据记录器
+│   ├── flight_data_recorder.py # 飞行数据记录器 (ESP32优化)
+│   ├── sensor_analysis.py      # RoboMaster TT传感器分析工具
 │   ├── images/           # 图片保存
 │   ├── videos/           # 视频保存
-│   └── flight_records/   # 飞行数据CSV文件
+│   └── flight_records/   # 飞行数据CSV文件 (18列传感器数据)
 ├── utils/
 │   ├── logger.py          # 日志系统
 │   ├── safety.py          # 安全机制
@@ -150,10 +165,13 @@ rmtt/
 │   ├── flight_data_recording.py # 数据记录演示
 │   └── data_format_test.py # 数据格式测试
 ├── experiments/
-│   ├── altitude_experiment.py # 高度控制实验
+│   ├── altitude_experiment.py # 高度控制实验 (双重定高优化)
 │   ├── experiment_config.py # 实验参数配置
-│   └── README.md         # 实验使用说明
-└── logs/                  # 日志文件
+│   └── README.md         # 实验使用说明 (RoboMaster TT特性)
+├── docs/
+│   └── ROBOMASTER_TT_SPECS.md # RoboMaster TT技术规格文档
+├── logs/                  # 日志文件
+└── test_data_recording.py # 数据记录功能测试脚本
 ```
 
 ## 配置说明
@@ -178,16 +196,22 @@ FLIGHT_DATA_CSV_ENCODING = 'utf-8-sig'       # CSV编码
 
 系统支持高频飞行数据记录，以CSV格式存储无人机的关键飞行参数：
 
-### 记录的数据字段
+### RoboMaster TT数据字段（18列完整传感器数据）
 
-| 字段名 | 描述 | 单位 |
-|--------|------|------|
-| `timestamp` | 绝对时间戳 | ISO格式 |
-| `relative_time` | 相对飞行开始时间 | 秒 |
-| `x_cm`, `y_cm`, `z_cm` | 相对位置坐标 | cm |
-| `pitch_deg`, `roll_deg`, `yaw_deg` | 俯仰、翻滚、偏航角 | 度 |
-| `vgx_cm_s`, `vgy_cm_s`, `vgz_cm_s` | 速度分量 | cm/s |
-| `agx_0001g`, `agy_0001g`, `agz_0001g` | 加速度分量 | 0.001g |
+| 字段名 | 描述 | 单位 | 传感器来源 |
+|--------|------|------|----------|
+| `timestamp` | 绝对时间戳 | ISO格式 | 系统时钟 |
+| `relative_time` | 相对实验开始时间 | 秒 | 计算值 |
+| `height_cm` | 主要高度数据 | cm | 融合传感器 |
+| `battery_percent` | 电池电量 | % | ESP32监控 |
+| `temperature_deg` | 温度 | °C | 内置传感器 |
+| `pitch_deg`, `roll_deg`, `yaw_deg` | 姿态角度 | 度 | IMU传感器 |
+| `tof_distance_cm` | 红外TOF距离 | cm | 红外定高传感器 |
+| `barometer_cm` | 气压计高度 | cm | 气压计定高传感器 |
+| `height_diff_cm` | 两传感器高度差 | cm | 计算值 |
+| `vgx_cm_s`, `vgy_cm_s`, `vgz_cm_s` | 三轴速度分量 | cm/s | ESP32计算 |
+| `agx_0001g`, `agy_0001g`, `agz_0001g` | 三轴加速度分量 | 0.001g | ESP32计算 |
+| `wifi_snr` | WiFi信号强度 | dBm | ESP32监控 |
 
 ### 使用方式
 
@@ -209,9 +233,28 @@ record_data stop                  # 停止记录
 20250827_143025_session_name_drone_data.csv  # 带会话名
 ```
 
-### 数据分析建议
+### RoboMaster TT数据分析工具
 
-生成的CSV文件可以使用以下工具进行分析：
+**专业传感器分析工具：**
+```bash
+# 基本传感器性能分析
+python data/sensor_analysis.py your_data.csv
+
+# 生成传感器对比图表
+python data/sensor_analysis.py your_data.csv --plot
+
+# 保存分析结果到指定目录
+python data/sensor_analysis.py your_data.csv --plot --output ./analysis/
+```
+
+**分析功能：**
+- ✅ 双重定高传感器对比（TOF vs 气压计）
+- ✅ ESP32性能监控（数据采集频率、WiFi质量）
+- ✅ 传感器数据完整性检查
+- ✅ 自动生成传感器性能报告
+- ✅ 可视化图表（高度对比、速度分析、系统状态）
+
+**通用分析工具：**
 - **Python**: pandas, matplotlib, numpy
 - **MATLAB**: readtable, plot
 - **Excel**: 直接导入分析
@@ -243,12 +286,15 @@ TARGET_HEIGHT = 200        # 修改目标高度(cm)
 DESCENT_SPEED = 0.05       # 修改下降速度(m/s)
 ```
 
-**实验特性:**
-- ✅ 自动数据记录（50Hz采样）
-- ✅ 精确速度控制（±0.01m/s）
-- ✅ 安全检查机制
-- ✅ 自动生成实验报告
-- ✅ 实时状态监控
+**RoboMaster TT实验特性:**
+- ✅ **双重定高精度控制**: 充分利用TOF+气压计优势
+- ✅ **高频数据采集**: 50Hz采样，18列完整传感器数据
+- ✅ **ESP32边缘计算**: 实时速度和加速度计算
+- ✅ **传感器融合分析**: TOF与气压计对比验证
+- ✅ **精确速度控制**: ±0.01m/s控制精度
+- ✅ **智能安全机制**: 电池、连接、高度多重保护
+- ✅ **自动实验报告**: 传感器性能和实验数据分析
+- ✅ **WiFi质量监控**: ESP32连接稳定性实时监测
 
 **输出文件:**
 - **数据文件**: `data/flight_records/YYYYMMDD_HHMMSS_altitude_control_experiment.csv`
