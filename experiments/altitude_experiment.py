@@ -172,7 +172,7 @@ class AltitudeExperiment:
             return False
     
     def execute_controlled_descent(self):
-        """执行受控下降"""
+        """执行受控下降 - 优化版本，避免分步下降"""
         try:
             # 计算下降参数
             height_diff = TARGET_HEIGHT - FINAL_HEIGHT  # 需要下降的高度 (cm)
@@ -181,36 +181,59 @@ class AltitudeExperiment:
             # 计算理论下降时间
             total_descent_time = height_diff / descent_speed_cm_s
             
-            # 分步下降，每次下降小段距离以实现平滑控制
-            step_distance = STEP_DISTANCE  # 每次下降距离
-            step_time = step_distance / descent_speed_cm_s  # 每步所需时间
+            self.logger.info(f"优化下降控制: 总距离={height_diff}cm, 速度={descent_speed_cm_s}cm/s ({DESCENT_SPEED}m/s), 预计时间={total_descent_time:.1f}秒")
             
-            self.logger.info(f"下降控制参数: 总距离={height_diff}cm, 速度={descent_speed_cm_s}cm/s, 预计时间={total_descent_time:.1f}秒")
-            
-            steps = int(height_diff // step_distance)
-            remainder = height_diff % step_distance
-            
-            # 执行分步下降
-            for step in range(steps):
-                self.logger.info(f"下降步骤 {step+1}/{steps}: 下降 {step_distance}cm")
-                self.controller.move_down(step_distance)
-                time.sleep(step_time)  # 控制下降速度
-            
-            # 处理剩余距离
-            if remainder > 5:  # 如果剩余距离大于5cm
-                self.logger.info(f"最终调整: 下降 {int(remainder)}cm")
-                self.controller.move_down(int(remainder))
-                final_wait_time = remainder / descent_speed_cm_s
-                time.sleep(final_wait_time)
+            # 直接下降到目标高度，避免分步停顿
+            # 使用Tello的速度控制命令实现连续下降
+            try:
+                # 方案1: 使用rc命令实现连续下降
+                tello = self.connection_manager.get_tello()
+                
+                self.logger.info(f"开始连续下降 {height_diff}cm...")
+                
+                # 计算rc命令的下降速度参数 (Tello rc命令范围: -100到100)
+                # 负值表示下降，速度映射到-100到0范围
+                rc_speed = min(-10, -int(descent_speed_cm_s * 0.5))  # 保守映射，确保不会太快
+                
+                # 开始连续下降
+                start_time = time.time()
+                tello.send_rc_control(0, 0, rc_speed, 0)  # left_right, forward_backward, up_down, yaw
+                
+                # 监控下降过程
+                while time.time() - start_time < total_descent_time:
+                    current_height = self.get_current_height()
+                    if current_height is not None and current_height <= FINAL_HEIGHT + 5:
+                        # 接近目标高度，停止下降
+                        break
+                    time.sleep(0.1)  # 短暂检查间隔
+                
+                # 停止下降
+                tello.send_rc_control(0, 0, 0, 0)
+                time.sleep(0.5)  # 等待稳定
+                
+            except Exception as rc_error:
+                self.logger.warning(f"RC连续下降失败，使用备用方案: {rc_error}")
+                
+                # 方案2: 单次大距离下降
+                self.logger.info(f"使用单次下降命令: 下降 {height_diff}cm")
+                self.controller.move_down(height_diff)
+                
+                # 等待下降完成
+                time.sleep(total_descent_time + 1)  # 额外1秒缓冲
             
             # 验证最终高度
             final_height = self.get_current_height()
             if final_height is not None:
-                self.logger.info(f"下降完成，当前高度: {final_height}cm (目标: {FINAL_HEIGHT}cm)")
+                height_error = abs(final_height - FINAL_HEIGHT)
+                if height_error > HEIGHT_TOLERANCE:
+                    self.logger.warning(f"高度偏差较大: 当前{final_height}cm, 目标{FINAL_HEIGHT}cm, 偏差{height_error}cm")
+                else:
+                    self.logger.info(f"下降完成，当前高度: {final_height}cm (目标: {FINAL_HEIGHT}cm, 偏差: {height_error}cm)")
             
         except Exception as e:
-            self.logger.error(f"受控下降执行失败: {e}")
-            # 紧急情况，直接下降到目标高度
+            self.logger.error(f"优化下降控制失败: {e}")
+            # 紧急情况，使用传统下降方法
+            self.logger.info("使用紧急下降方案...")
             self.controller.move_down(TARGET_HEIGHT - FINAL_HEIGHT)
     
     def get_current_height(self):

@@ -151,12 +151,18 @@ class FlightDataRecorder:
             data_row.append(datetime.now().isoformat())
             data_row.append(round(current_time - self.record_start_time, 3))  # 相对时间(秒)，保留3位小数
             
-            # 高度数据 - 使用最可靠的高度传感器
+            # 高度数据 - 优先使用TOF传感器提供厘米级精度
             try:
-                height = tello.get_height()
-                data_row.append(height if height is not None else 0)
+                # 优先使用TOF传感器（更精确）
+                tof_height = tello.get_distance_tof()
+                if tof_height is not None and tof_height > 0:
+                    data_row.append(tof_height)  # TOF传感器厘米级精度
+                else:
+                    # TOF无效时使用API高度
+                    api_height = tello.get_height()
+                    data_row.append(api_height if api_height is not None else 0)
             except Exception as e:
-                if self.data_points_recorded < 5:  # 只在开始时记录错误
+                if self.data_points_recorded < 5:
                     self.logger.warning(f"获取高度失败: {e}")
                 data_row.append(0)
             
@@ -179,15 +185,35 @@ class FlightDataRecorder:
             baro_height = 0
             
             try:
-                state = tello.get_current_state()
-                if state and isinstance(state, str):
+                # 使用原始UDP状态数据而非get_current_state()
+                state = None
+                try:
+                    # 直接访问Tello的状态数据
+                    if hasattr(tello, 'get_current_state'):
+                        state = tello.get_current_state()
+                    elif hasattr(tello, 'state'):
+                        # 尝试访问内部状态
+                        state_dict = tello.state
+                        if state_dict:
+                            # 构建状态字符串
+                            state_parts = []
+                            for key, value in state_dict.items():
+                                state_parts.append(f"{key}:{value}")
+                            state = ";".join(state_parts) + ";"
+                except:
+                    state = None
+                
+                if state and isinstance(state, str) and len(state) > 20:
                     # 仅在第一次记录时显示ESP32状态字符串示例
                     if self.data_points_recorded == 0:
                         self.logger.info(f"RoboMaster TT ESP32状态字符串: {state[:200]}...")
                     
                     # 解析姿态角度 (pitch, roll, yaw)
                     attitude_data = self._parse_state_data(state, ['pitch', 'roll', 'yaw'])
-                    data_row.extend([val if val is not None else 0.0 for val in attitude_data])
+                    pitch_val = attitude_data[0] if attitude_data[0] is not None else 0.0
+                    roll_val = attitude_data[1] if attitude_data[1] is not None else 0.0
+                    yaw_val = attitude_data[2] if attitude_data[2] is not None else 0.0
+                    data_row.extend([pitch_val, roll_val, yaw_val])
                     
                     # 解析传感器数据 - RoboMaster TT特有的红外定高和气压计
                     sensor_data = self._parse_state_data(state, ['tof', 'baro'])
@@ -195,44 +221,58 @@ class FlightDataRecorder:
                     baro_height = sensor_data[1] if sensor_data[1] is not None else 0
                     data_row.extend([tof_distance, baro_height])
                     
-                    # 计算TOF与气压计高度差 - 用于地面检测和传感器对比
+                    # 计算TOF与气压计高度差
                     height_diff = abs(tof_distance - baro_height) if (tof_distance > 0 and baro_height > 0) else 0
                     data_row.append(height_diff)
                     
                     # 解析ESP32提供的速度数据
                     velocity_data = self._parse_state_data(state, ['vgx', 'vgy', 'vgz'])
-                    data_row.extend([val if val is not None else 0.0 for val in velocity_data])
+                    vgx = velocity_data[0] if velocity_data[0] is not None else 0.0
+                    vgy = velocity_data[1] if velocity_data[1] is not None else 0.0
+                    vgz = velocity_data[2] if velocity_data[2] is not None else 0.0
+                    data_row.extend([vgx, vgy, vgz])
                     
                     # 解析ESP32提供的加速度数据
                     acceleration_data = self._parse_state_data(state, ['agx', 'agy', 'agz'])
-                    data_row.extend([val if val is not None else 0 for val in acceleration_data])
+                    agx = acceleration_data[0] if acceleration_data[0] is not None else 0
+                    agy = acceleration_data[1] if acceleration_data[1] is not None else 0
+                    agz = acceleration_data[2] if acceleration_data[2] is not None else 0
+                    data_row.extend([agx, agy, agz])
                     
-                    # 解析ESP32 WiFi信号质量
-                    wifi_data = self._parse_state_data(state, ['wifi_snr'])
-                    wifi_snr = wifi_data[0] if wifi_data and wifi_data[0] is not None else -1
+                    # 尝试解析WiFi信号质量（如果存在）
+                    wifi_data = self._parse_state_data(state, ['wifi_snr', 'wifi', 'snr'])
+                    wifi_snr = -1
+                    for val in wifi_data:
+                        if val is not None and val != -1:
+                            wifi_snr = val
+                            break
                     data_row.append(wifi_snr)
                     
                 else:
-                    # 状态字符串无效时使用API调用备用方案
+                    # 状态字符串无效或为空时使用API调用备用方案
                     if self.data_points_recorded < 3:
-                        self.logger.warning("ESP32状态字符串无效，使用API备用方案")
+                        self.logger.warning(f"ESP32状态字符串无效或为空: '{state}', 使用API备用方案")
                     
-                    # 姿态角度
+                    # 姿态角度 - 直接API调用
                     try:
-                        pitch = tello.get_pitch() or 0.0
-                        roll = tello.get_roll() or 0.0  
-                        yaw = tello.get_yaw() or 0.0
+                        pitch = float(tello.get_pitch() or 0.0)
+                        roll = float(tello.get_roll() or 0.0)
+                        yaw = float(tello.get_yaw() or 0.0)
                         data_row.extend([pitch, roll, yaw])
-                    except:
+                    except Exception as api_error:
+                        if self.data_points_recorded < 3:
+                            self.logger.debug(f"姿态角度API调用失败: {api_error}")
                         data_row.extend([0.0, 0.0, 0.0])
                     
                     # 传感器数据
                     try:
-                        tof_distance = tello.get_distance_tof() or 0
-                        baro_height = tello.get_barometer() or 0
+                        tof_distance = int(tello.get_distance_tof() or 0)
+                        baro_height = float(tello.get_barometer() or 0)
                         height_diff = abs(tof_distance - baro_height) if (tof_distance > 0 and baro_height > 0) else 0
                         data_row.extend([tof_distance, baro_height, height_diff])
-                    except:
+                    except Exception as sensor_error:
+                        if self.data_points_recorded < 3:
+                            self.logger.debug(f"传感器API调用失败: {sensor_error}")
                         data_row.extend([0, 0, 0])
                     
                     # 速度和加速度数据无法通过单独API获取
