@@ -3,6 +3,9 @@
 import sys
 import argparse
 import signal
+import atexit
+import time
+from datetime import datetime
 from pathlib import Path
 from colorama import init, Fore, Style
 
@@ -26,13 +29,101 @@ class TelloCommander:
         self.video_handler = None
         self.media_saver = MediaSaver()
         self.running = True
+        self.session_start_time = datetime.now()
+        self.session_stats = {
+            'photos_taken': 0,
+            'videos_recorded': 0,
+            'flight_time': 0,
+            'commands_executed': 0
+        }
         
         signal.signal(signal.SIGINT, self._signal_handler)
+        atexit.register(self._cleanup_on_exit)
     
     def _signal_handler(self, signum, frame):
         print(f"\n{Fore.YELLOW}接收到中断信号，正在安全退出...{Style.RESET_ALL}")
         self.shutdown()
         sys.exit(0)
+    
+    def _cleanup_on_exit(self):
+        if self.running:
+            self.logger.info("程序退出时执行清理操作...")
+            self._auto_save_media_data()
+    
+    def _auto_save_media_data(self):
+        from config.settings import AUTO_SAVE_ON_EXIT, CREATE_SESSION_BACKUP, GENERATE_SESSION_REPORT
+        
+        if not AUTO_SAVE_ON_EXIT:
+            return
+            
+        try:
+            self.logger.info("开始自动保存媒体数据...")
+            
+            # 1. 停止任何正在进行的录制
+            if self.video_handler and self.video_handler.recording:
+                self.logger.info("检测到正在录制，停止录制并保存视频...")
+                self.video_handler.stop_recording()
+                self.session_stats['videos_recorded'] += 1
+            
+            # 2. 停止视频流
+            if self.video_handler and self.video_handler.streaming:
+                self.video_handler.stop_stream()
+            
+            # 3. 创建媒体备份 (可配置)
+            if CREATE_SESSION_BACKUP:
+                backup_path = self.media_saver.create_media_backup()
+                if backup_path:
+                    self.logger.info(f"媒体备份已创建: {backup_path}")
+            
+            # 4. 生成会话报告 (可配置)
+            if GENERATE_SESSION_REPORT:
+                self._generate_session_report()
+            
+            # 5. 获取并显示统计信息
+            stats = self.media_saver.get_media_stats()
+            if stats:
+                print(f"\n{Fore.CYAN}=== 本次会话媒体统计 ==={Style.RESET_ALL}")
+                print(f"拍摄照片: {self.session_stats['photos_taken']}张")
+                print(f"录制视频: {self.session_stats['videos_recorded']}个") 
+                print(f"总图片数: {stats['images']['count']}张 ({stats['images']['size_mb']}MB)")
+                print(f"总视频数: {stats['videos']['count']}个 ({stats['videos']['size_mb']}MB)")
+                print(f"媒体总大小: {stats['total_size_mb']}MB")
+                print(f"执行命令: {self.session_stats['commands_executed']}次")
+                print(f"飞行时间: {self.session_stats['flight_time']}秒")
+            
+            self.logger.info("媒体数据自动保存完成")
+            
+        except Exception as e:
+            self.logger.error(f"自动保存媒体数据失败: {e}")
+    
+    def _generate_session_report(self):
+        try:
+            session_duration = datetime.now() - self.session_start_time
+            report_content = f"""
+=== RMTT 会话报告 ===
+会话开始时间: {self.session_start_time.strftime('%Y-%m-%d %H:%M:%S')}
+会话结束时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+会话总时长: {str(session_duration).split('.')[0]}
+拍摄照片数: {self.session_stats['photos_taken']}
+录制视频数: {self.session_stats['videos_recorded']}
+飞行时间: {self.session_stats['flight_time']}秒
+执行命令数: {self.session_stats['commands_executed']}
+"""
+            
+            # 保存报告到logs目录
+            from config.settings import LOGS_DIR
+            LOGS_DIR.mkdir(exist_ok=True)
+            
+            report_filename = f"session_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            report_path = LOGS_DIR / report_filename
+            
+            with open(report_path, 'w', encoding='utf-8') as f:
+                f.write(report_content)
+            
+            self.logger.info(f"会话报告已保存: {report_path}")
+            
+        except Exception as e:
+            self.logger.error(f"生成会话报告失败: {e}")
     
     def connect(self):
         try:
@@ -57,11 +148,19 @@ class TelloCommander:
     
     def shutdown(self):
         self.running = False
+        self._auto_save_media_data()  # 确保退出时保存数据
         self.disconnect()
     
     def interactive_mode(self):
+        from config.settings import AUTO_SAVE_ON_EXIT
+        
         print(f"{Fore.CYAN}=== Tello无人机控制系统 ==={Style.RESET_ALL}")
         print("输入 'help' 查看可用命令，输入 'quit' 退出")
+        
+        if AUTO_SAVE_ON_EXIT:
+            print(f"{Fore.GREEN}自动保存已启用：程序退出时将自动保存视频和生成报告{Style.RESET_ALL}")
+        
+        print()
         
         while self.running:
             try:
@@ -86,6 +185,8 @@ class TelloCommander:
         args = parts[1:] if len(parts) > 1 else []
         
         try:
+            # 记录命令执行次数
+            self.session_stats['commands_executed'] += 1
             if command == 'help':
                 self._show_help()
             
@@ -94,10 +195,15 @@ class TelloCommander:
             
             elif command == 'takeoff':
                 if self.controller:
+                    flight_start = time.time()
                     self.controller.takeoff()
+                    self.session_stats['flight_start_time'] = flight_start
             
             elif command == 'land':
                 if self.controller:
+                    if 'flight_start_time' in self.session_stats:
+                        flight_duration = int(time.time() - self.session_stats['flight_start_time'])
+                        self.session_stats['flight_time'] += flight_duration
                     self.controller.land()
             
             elif command == 'emergency':
@@ -128,9 +234,12 @@ class TelloCommander:
             
             elif command == 'record':
                 action = args[0] if args else 'start'
+                if action == 'start':
+                    self.session_stats['videos_recorded'] += 1
                 self._handle_recording(action)
             
             elif command == 'photo':
+                self.session_stats['photos_taken'] += 1
                 self._take_photo()
             
             elif command == 'media':
@@ -219,7 +328,7 @@ class TelloCommander:
 {Fore.YELLOW}连接和状态:{Style.RESET_ALL}
   status              - 显示无人机状态
   help                - 显示此帮助信息
-  quit/exit           - 退出程序
+  quit/exit           - 退出程序 (自动保存数据)
 
 {Fore.YELLOW}飞行控制:{Style.RESET_ALL}
   takeoff             - 起飞
@@ -241,15 +350,23 @@ class TelloCommander:
 {Fore.YELLOW}视频和拍照:{Style.RESET_ALL}
   stream start/stop   - 启动/停止视频流
   record start/stop   - 开始/停止录制
-  photo               - 拍照
+  photo               - 拍照 (自动计入统计)
   media               - 显示媒体文件统计
+
+{Fore.YELLOW}自动保存功能:{Style.RESET_ALL}
+  程序退出时自动执行:
+     - 停止进行中的录制
+     - 创建媒体文件备份
+     - 生成详细会话报告
+     - 显示统计信息
 
 {Fore.YELLOW}示例:{Style.RESET_ALL}
   takeoff             - 起飞
+  stream start        - 开启视频流
+  record start        - 开始录制
   up 100              - 上升100cm
-  cw 180              - 顺时针旋转180度
   photo               - 拍照
-  land                - 降落
+  land                - 降落 (退出时自动保存所有数据)
 """
         print(help_text)
 
