@@ -134,11 +134,25 @@ class AltitudeExperiment:
             if current_height is not None:
                 height_diff = TARGET_HEIGHT - current_height
                 if abs(height_diff) > HEIGHT_TOLERANCE:  # 如果高度差超过容差
-                    if height_diff > 0:
-                        self.controller.move_up(int(abs(height_diff)))
-                    else:
-                        self.controller.move_down(int(abs(height_diff)))
-                    time.sleep(STABILIZATION_TIME)  # 等待移动完成
+                    # 分段移动以避免超过安全限制
+                    remaining_distance = int(abs(height_diff))
+                    max_single_move = 150  # 单次最大移动距离
+                    
+                    while remaining_distance > HEIGHT_TOLERANCE:
+                        move_distance = min(remaining_distance, max_single_move)
+                        
+                        if height_diff > 0:
+                            self.controller.move_up(move_distance)
+                        else:
+                            self.controller.move_down(move_distance)
+                        
+                        remaining_distance -= move_distance
+                        time.sleep(STABILIZATION_TIME)  # 等待移动完成
+                        
+                        # 更新当前高度
+                        new_height = self.get_current_height()
+                        if new_height is not None:
+                            height_diff = TARGET_HEIGHT - new_height
             
             # 阶段2: 悬停
             self.logger.info(f"[周期 {cycle_num}] 阶段2: 在 {TARGET_HEIGHT}cm 悬停 {HOVER_DURATION}秒...")
