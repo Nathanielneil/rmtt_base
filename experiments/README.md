@@ -50,14 +50,14 @@
 | `HOVER_DURATION` | 3秒 | 悬停持续时间 |
 | `DESCENT_SPEED` | 0.1m/s | 下降速度 |
 | `FINAL_HEIGHT` | 10cm | 最终下降高度 |
-| `CYCLE_REST_TIME` | 5秒 | 周期间隔时间 |
+| `CYCLE_REST_TIME` | 1秒 | 周期间隔时间（已优化） |
 
 #### 高级参数
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `STEP_DISTANCE` | 20cm | 分步下降距离 |
 | `HEIGHT_TOLERANCE` | 10cm | 高度调整容差 |
-| `STABILIZATION_TIME` | 2秒 | 移动后稳定时间 |
+| `STABILIZATION_TIME` | 1秒 | 移动后稳定时间（已优化） |
 
 #### 安全参数
 | 参数 | 默认值 | 说明 |
@@ -132,6 +132,11 @@
 - **首次使用**: 建议使用默认参数
 - **精确控制**: 可减小`STEP_DISTANCE`和`HEIGHT_TOLERANCE`
 - **快速测试**: 可减少`EXPERIMENT_CYCLES`和`HOVER_DURATION`
+- **电池续航优化**: 
+  - 减少`EXPERIMENT_CYCLES`（如改为2个周期）
+  - 缩短`HOVER_DURATION`（如改为2秒）
+  - 已优化`CYCLE_REST_TIME`为1秒
+  - 已优化`STABILIZATION_TIME`为1秒
 
 ### 数据分析
 

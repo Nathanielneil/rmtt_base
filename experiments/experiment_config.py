@@ -4,6 +4,13 @@
 """
 
 # =================实验参数配置=================
+# 
+# 电池续航优化说明:
+# - CYCLE_REST_TIME: 已从5秒减少到1秒，节省电池
+# - STABILIZATION_TIME: 已从2秒减少到1秒，减少等待时间
+# - 如需更长实验，可考虑减少 EXPERIMENT_CYCLES 或 HOVER_DURATION
+#
+# =================实验参数配置=================
 
 # 基础实验参数
 EXPERIMENT_CYCLES = 3           # 实验周期数量（修改这里改变周期数）
@@ -11,12 +18,12 @@ TARGET_HEIGHT = 150             # 目标高度 (cm) - 1.5m
 HOVER_DURATION = 3              # 悬停时间 (秒)
 DESCENT_SPEED = 0.1             # 下降速度 (m/s)
 FINAL_HEIGHT = 10               # 最终高度 (cm) - 0.1m
-CYCLE_REST_TIME = 5             # 每周期间隔时间 (秒)
+CYCLE_REST_TIME = 1             # 每周期间隔时间 (秒) - 缩短以节省电池
 
 # 高级参数
 STEP_DISTANCE = 20              # 分步下降时每步距离 (cm)
 HEIGHT_TOLERANCE = 10           # 高度调整容差 (cm)
-STABILIZATION_TIME = 2          # 移动后稳定时间 (秒)
+STABILIZATION_TIME = 1          # 移动后稳定时间 (秒) - 缩短以节省电池
 
 # 安全参数  
 MIN_BATTERY_LEVEL = 25          # 最低电池电量要求 (%)
@@ -29,12 +36,13 @@ EXPERIMENTER_NAME = ""          # 可选：实验员姓名
 
 # 实验描述（自动生成）
 EXPERIMENT_DESCRIPTION = f"""
-高度控制实验 - {EXPERIMENT_CYCLES}个周期
+高度控制实验 - {EXPERIMENT_CYCLES}个周期 (优化电池使用)
 - 目标高度: {TARGET_HEIGHT}cm ({TARGET_HEIGHT/100}m)
 - 悬停时间: {HOVER_DURATION}秒  
 - 下降速度: {DESCENT_SPEED}m/s
 - 最终高度: {FINAL_HEIGHT}cm ({FINAL_HEIGHT/100}m)
-- 周期间隔: {CYCLE_REST_TIME}秒
+- 周期间隔: {CYCLE_REST_TIME}秒 (节省电池)
+- 稳定等待: {STABILIZATION_TIME}秒 (优化)
 """
 
 # ==============================================
