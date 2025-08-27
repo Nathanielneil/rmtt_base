@@ -10,12 +10,27 @@
 
 ### 实验设计
 
-实验设计为多周期的高度控制测试：
+实验设计为多周期的高度控制测试，充分利用RoboMaster TT的传感器优势：
 
 1. **起飞阶段**: 无人机起飞到指定高度（默认1.5m）
 2. **悬停阶段**: 在目标高度悬停指定时间（默认3秒）
 3. **下降阶段**: 以恒定速度缓慢下降到最终高度（默认0.1m）
 4. **周期重复**: 重复上述过程指定次数
+
+### RoboMaster TT传感器特性
+
+#### 硬件配置
+- **主控芯片**: ESP32-D2WD (双核240MHz，WiFi集成)
+- **红外定高**: TOF距离传感器，近距离高精度测量(0-8m)
+- **气压计定高**: 绝对气压高度，不受地面干扰
+- **IMU传感器**: 六轴陀螺仪+加速度计，提供姿态和运动数据
+
+#### 传感器融合优势
+- **双重定高**: 红外TOF + 气压计，互相校验提高精度
+- **近地精确**: TOF传感器在低高度(0-2m)提供厘米级精度
+- **高度稳定**: 气压计提供连续的绝对高度参考
+- **实时运动**: ESP32实时计算速度和加速度数据
+- **连接监控**: WiFi信号强度实时监控，确保控制稳定性
 
 ### 快速开始
 
@@ -71,17 +86,19 @@
 - **飞行数据**: 自动保存到 `../data/flight_records/` 目录
 - **格式**: CSV文件，包含时间戳、高度、姿态、速度、加速度等数据
 - **频率**: 50Hz高频采样
-- **数据列说明**:
+- **数据列说明** (针对RoboMaster TT ESP32-D2WD主控优化):
   - `timestamp`: 绝对时间戳 (ISO格式)
   - `relative_time`: 相对实验开始的时间(秒)，便于数据分析
-  - `height_cm`: 无人机高度(厘米) - 核心实验数据
+  - `height_cm`: 主要高度数据(厘米) - 融合传感器结果
   - `battery_percent`: 电池电量百分比
   - `temperature_deg`: 温度(摄氏度)
   - `pitch_deg`, `roll_deg`, `yaw_deg`: 姿态角度(度)
-  - `tof_distance_cm`: TOF距离传感器读数(厘米)
-  - `barometer_cm`: 气压计高度(厘米)
-  - `vgx_cm_s`, `vgy_cm_s`, `vgz_cm_s`: 三轴速度分量(厘米/秒)
-  - `agx_0001g`, `agy_0001g`, `agz_0001g`: 三轴加速度分量(0.001g单位)
+  - `tof_distance_cm`: 红外TOF距离传感器(厘米) - 近距离精确定高
+  - `barometer_cm`: 气压计高度(厘米) - 绝对高度参考
+  - `height_diff_cm`: TOF与气压计高度差(厘米) - 地面检测和传感器对比
+  - `vgx_cm_s`, `vgy_cm_s`, `vgz_cm_s`: ESP32计算的三轴速度分量(厘米/秒)
+  - `agx_0001g`, `agy_0001g`, `agz_0001g`: ESP32计算的三轴加速度分量(0.001g单位)
+  - `wifi_snr`: ESP32 WiFi信号强度 - 连接质量监控
 
 #### 日志文件  
 - **程序日志**: 保存到 `../logs/` 目录
@@ -151,7 +168,23 @@
 
 ### 数据分析
 
-实验完成后，可使用以下方式分析数据：
+实验完成后，可使用以下方式分析RoboMaster TT的传感器数据：
+
+#### 快速分析工具
+
+使用内置的传感器分析工具：
+```bash
+# 基本分析
+python ../data/sensor_analysis.py path_to_flight_record.csv
+
+# 生成图表
+python ../data/sensor_analysis.py path_to_flight_record.csv --plot
+
+# 保存图表到指定目录
+python ../data/sensor_analysis.py path_to_flight_record.csv --plot --output ./analysis_results/
+```
+
+#### 手动数据分析
 
 ```python
 import pandas as pd
@@ -160,34 +193,44 @@ import matplotlib.pyplot as plt
 # 读取实验数据
 data = pd.read_csv('path_to_flight_record.csv')
 
-# 分析高度变化
-plt.figure(figsize=(12, 8))
+# RoboMaster TT传感器对比分析
+fig, axes = plt.subplots(2, 2, figsize=(15, 10))
 
-# 子图1: 高度变化
-plt.subplot(2, 1, 1)
-plt.plot(data['relative_time'], data['height_cm'], 'b-', linewidth=2)
-plt.xlabel('时间 (秒)')
-plt.ylabel('高度 (cm)')
-plt.title('RoboMaster TT高度控制实验 - 高度变化')
-plt.grid(True)
+# 双重定高传感器对比
+axes[0,0].plot(data['relative_time'], data['height_cm'], 'b-', linewidth=2, label='融合高度')
+axes[0,0].plot(data['relative_time'], data['tof_distance_cm'], 'r--', alpha=0.7, label='TOF红外')
+axes[0,0].plot(data['relative_time'], data['barometer_cm'], 'g:', alpha=0.7, label='气压计')
+axes[0,0].set_title('RoboMaster TT双重定高传感器对比')
+axes[0,0].legend()
+axes[0,0].grid(True)
 
-# 子图2: 速度分析
-plt.subplot(2, 1, 2)
-plt.plot(data['relative_time'], data['vgz_cm_s'], 'r-', linewidth=2)
-plt.xlabel('时间 (秒)')
-plt.ylabel('垂直速度 (cm/s)')
-plt.title('垂直速度变化')
-plt.grid(True)
+# 传感器高度差分析
+axes[0,1].plot(data['relative_time'], data['height_diff_cm'], 'purple')
+axes[0,1].set_title('TOF与气压计高度差')
+axes[0,1].set_ylabel('高度差 (cm)')
+axes[0,1].grid(True)
+
+# ESP32三轴速度数据
+axes[1,0].plot(data['relative_time'], data['vgx_cm_s'], 'r-', alpha=0.7, label='X速度')
+axes[1,0].plot(data['relative_time'], data['vgy_cm_s'], 'g-', alpha=0.7, label='Y速度')
+axes[1,0].plot(data['relative_time'], data['vgz_cm_s'], 'b-', linewidth=2, label='Z速度')
+axes[1,0].set_title('ESP32三轴速度数据')
+axes[1,0].legend()
+axes[1,0].grid(True)
+
+# ESP32系统状态
+axes[1,1].plot(data['relative_time'], data['battery_percent'], 'orange', linewidth=2)
+axes[1,1].set_title('电池电量变化')
+axes[1,1].set_ylabel('电量 (%)')
+axes[1,1].grid(True)
 
 plt.tight_layout()
 plt.show()
 
-# 分析电池消耗
-plt.figure(figsize=(10, 6))
-plt.plot(data['relative_time'], data['battery_percent'], 'g-', linewidth=2)
-plt.xlabel('时间 (秒)')
-plt.ylabel('电池电量 (%)')
-plt.title('实验过程电池消耗')
-plt.grid(True)
-plt.show()
+# 分析传感器性能
+print("=== RoboMaster TT传感器性能分析 ===")
+print(f"TOF传感器覆盖率: {(data['tof_distance_cm'] > 0).sum() / len(data) * 100:.1f}%")
+print(f"气压计数据完整性: {data['barometer_cm'].notna().sum() / len(data) * 100:.1f}%") 
+print(f"平均传感器高度差: {data['height_diff_cm'].mean():.2f}cm")
+print(f"ESP32数据采集频率: {len(data) / data['relative_time'].max():.1f} Hz")
 ```

@@ -19,24 +19,26 @@ class FlightDataRecorder:
         self.record_start_time = None
         self.data_points_recorded = 0
         
-        # CSV字段定义 - 专注核心飞行数据
+        # CSV字段定义 - 针对RoboMaster TT ESP32-D2WD主控优化
         self.csv_headers = [
             'timestamp',          # 时间戳
             'relative_time',      # 相对实验开始时间(秒)
-            'height_cm',         # 高度(cm) - 主要数据
+            'height_cm',         # 主要高度数据(cm) - 融合传感器
             'battery_percent',    # 电池电量(%)
             'temperature_deg',    # 温度(°C)
             'pitch_deg',         # 俯仰角(度)
             'roll_deg',          # 翻滚角(度)
             'yaw_deg',           # 偏航角(度)
-            'tof_distance_cm',   # TOF距离传感器(cm)
-            'barometer_cm',      # 气压计高度(cm)
+            'tof_distance_cm',   # 红外TOF距离传感器(cm) - 近距离精确
+            'barometer_cm',      # 气压计高度(cm) - 绝对高度
+            'height_diff_cm',    # TOF与气压计高度差(cm) - 地面检测
             'vgx_cm_s',          # X轴速度分量(cm/s)
             'vgy_cm_s',          # Y轴速度分量(cm/s)  
             'vgz_cm_s',          # Z轴速度分量(cm/s)
             'agx_0001g',         # X轴加速度分量(0.001g)
             'agy_0001g',         # Y轴加速度分量(0.001g)
             'agz_0001g',         # Z轴加速度分量(0.001g)
+            'wifi_snr',          # WiFi信号强度 - ESP32网络质量
         ]
     
     def start_recording(self, session_name=None):
@@ -172,34 +174,50 @@ class FlightDataRecorder:
             except:
                 data_row.append(20)
             
-            # 获取完整状态字符串并解析所有数据
+            # 获取完整状态字符串并解析所有传感器数据
+            tof_distance = 0
+            baro_height = 0
+            
             try:
                 state = tello.get_current_state()
                 if state and isinstance(state, str):
-                    # 仅在第一次记录时显示状态字符串示例
+                    # 仅在第一次记录时显示ESP32状态字符串示例
                     if self.data_points_recorded == 0:
-                        self.logger.info(f"RoboMaster TT状态字符串示例: {state[:200]}...")
+                        self.logger.info(f"RoboMaster TT ESP32状态字符串: {state[:200]}...")
                     
                     # 解析姿态角度 (pitch, roll, yaw)
                     attitude_data = self._parse_state_data(state, ['pitch', 'roll', 'yaw'])
                     data_row.extend([val if val is not None else 0.0 for val in attitude_data])
                     
-                    # 解析距离传感器数据 (TOF和气压计)
+                    # 解析传感器数据 - RoboMaster TT特有的红外定高和气压计
                     sensor_data = self._parse_state_data(state, ['tof', 'baro'])
-                    data_row.extend([val if val is not None else 0 for val in sensor_data])
+                    tof_distance = sensor_data[0] if sensor_data[0] is not None else 0
+                    baro_height = sensor_data[1] if sensor_data[1] is not None else 0
+                    data_row.extend([tof_distance, baro_height])
                     
-                    # 解析速度分量 (vgx, vgy, vgz) - RoboMaster TT支持速度数据
+                    # 计算TOF与气压计高度差 - 用于地面检测和传感器对比
+                    height_diff = abs(tof_distance - baro_height) if (tof_distance > 0 and baro_height > 0) else 0
+                    data_row.append(height_diff)
+                    
+                    # 解析ESP32提供的速度数据
                     velocity_data = self._parse_state_data(state, ['vgx', 'vgy', 'vgz'])
                     data_row.extend([val if val is not None else 0.0 for val in velocity_data])
                     
-                    # 解析加速度分量 (agx, agy, agz) - RoboMaster TT支持加速度数据
+                    # 解析ESP32提供的加速度数据
                     acceleration_data = self._parse_state_data(state, ['agx', 'agy', 'agz'])
                     data_row.extend([val if val is not None else 0 for val in acceleration_data])
-                else:
-                    # 如果状态字符串无效，使用API调用尝试获取基础数据
-                    self.logger.warning("状态字符串无效，使用API调用获取基础数据")
                     
-                    # 姿态角度 - 使用单独的API调用
+                    # 解析ESP32 WiFi信号质量
+                    wifi_data = self._parse_state_data(state, ['wifi_snr'])
+                    wifi_snr = wifi_data[0] if wifi_data and wifi_data[0] is not None else -1
+                    data_row.append(wifi_snr)
+                    
+                else:
+                    # 状态字符串无效时使用API调用备用方案
+                    if self.data_points_recorded < 3:
+                        self.logger.warning("ESP32状态字符串无效，使用API备用方案")
+                    
+                    # 姿态角度
                     try:
                         pitch = tello.get_pitch() or 0.0
                         roll = tello.get_roll() or 0.0  
@@ -208,26 +226,29 @@ class FlightDataRecorder:
                     except:
                         data_row.extend([0.0, 0.0, 0.0])
                     
-                    # 距离传感器
+                    # 传感器数据
                     try:
-                        tof = tello.get_distance_tof() or 0
-                        baro = tello.get_barometer() or 0
-                        data_row.extend([tof, baro])
+                        tof_distance = tello.get_distance_tof() or 0
+                        baro_height = tello.get_barometer() or 0
+                        height_diff = abs(tof_distance - baro_height) if (tof_distance > 0 and baro_height > 0) else 0
+                        data_row.extend([tof_distance, baro_height, height_diff])
                     except:
-                        data_row.extend([0, 0])
+                        data_row.extend([0, 0, 0])
                     
-                    # 速度和加速度数据无法通过单独API获取，填充0
+                    # 速度和加速度数据无法通过单独API获取
                     data_row.extend([0.0, 0.0, 0.0])  # vgx, vgy, vgz
                     data_row.extend([0, 0, 0])        # agx, agy, agz
+                    data_row.append(-1)               # wifi_snr 未知
                     
             except Exception as e:
                 if self.data_points_recorded < 5:
-                    self.logger.error(f"数据解析失败: {e}")
+                    self.logger.error(f"ESP32数据解析失败: {e}")
                 # 填充默认值确保数据完整性
                 data_row.extend([0.0, 0.0, 0.0])  # pitch, roll, yaw
-                data_row.extend([0, 0])           # tof, baro
+                data_row.extend([0, 0, 0])        # tof, baro, height_diff
                 data_row.extend([0.0, 0.0, 0.0])  # vgx, vgy, vgz
                 data_row.extend([0, 0, 0])        # agx, agy, agz
+                data_row.append(-1)               # wifi_snr
             
             return data_row
             
