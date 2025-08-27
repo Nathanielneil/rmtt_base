@@ -212,7 +212,7 @@ class AltitudeExperiment:
             
             self.logger.info(f"优化下降控制: 总距离={height_diff}cm, 速度={descent_speed_cm_s}cm/s ({DESCENT_SPEED}m/s), 预计时间={total_descent_time:.1f}秒")
             
-            # 优化下降方案：优先使用RC控制，避免移动命令超时
+            # 主要使用RC控制，更可靠且精度足够
             try:
                 current_height = self.get_current_height()
                 if current_height is None:
@@ -222,57 +222,60 @@ class AltitudeExperiment:
                 actual_descent = current_height - FINAL_HEIGHT
                 self.logger.info(f"实际需要下降: {actual_descent}cm (从{current_height}cm到{FINAL_HEIGHT}cm)")
                 
-                if actual_descent > 50:
-                    # 大距离下降：直接使用RC控制
-                    self.logger.info("大距离下降，使用RC连续控制")
+                if actual_descent > 5:
+                    # 使用RC控制进行主要下降 - 更可靠的方法
+                    self.logger.info(f"使用RC控制下降 {actual_descent}cm")
                     self._rc_move_down(actual_descent)
-                elif actual_descent > 20:
-                    # 中等距离：尝试小步移动，失败则RC
-                    self.logger.info("中等距离下降，尝试小步移动")
-                    try:
-                        # 分两次下降
-                        step1 = int(actual_descent / 2)
-                        step2 = actual_descent - step1
+                    
+                    # 等待下降稳定
+                    time.sleep(1)
+                    
+                    # 验证最终高度，如果需要可进行微调
+                    final_height = self.get_current_height()
+                    if final_height is not None:
+                        height_error = abs(final_height - FINAL_HEIGHT)
+                        self.logger.info(f"RC下降完成: 当前{final_height}cm, 目标{FINAL_HEIGHT}cm, 偏差{height_error}cm")
                         
-                        self.logger.info(f"第一步下降: {step1}cm")
-                        self.controller.move_down(step1)
-                        time.sleep(2)
-                        
-                        mid_height = self.get_current_height()
-                        if mid_height:
-                            self.logger.info(f"中途高度: {mid_height}cm")
-                            remaining = mid_height - FINAL_HEIGHT
-                            if remaining > 5:
-                                self.logger.info(f"第二步下降: {remaining}cm")
-                                if remaining <= 20:
-                                    self.controller.move_down(int(remaining))
-                                    time.sleep(2)
-                                else:
-                                    self._rc_move_down(remaining)
-                        
-                    except Exception as step_error:
-                        self.logger.warning(f"分步下降失败: {step_error}, 改用RC控制")
-                        remaining_height = self.get_current_height()
-                        if remaining_height and remaining_height > FINAL_HEIGHT + 5:
-                            self._rc_move_down(remaining_height - FINAL_HEIGHT)
+                        # 如果偏差在可接受范围内但需要微调
+                        if 5 < height_error <= 20:  # 扩大微调范围，提高精度
+                            if final_height > FINAL_HEIGHT:
+                                self.logger.info(f"微调下降 {int(height_error)}cm")
+                                try:
+                                    # 使用小距离移动进行精确微调
+                                    move_distance = min(15, int(height_error))
+                                    self.controller.move_down(move_distance)
+                                    time.sleep(1)
+                                except Exception as adjust_error:
+                                    self.logger.warning(f"微调下降失败: {adjust_error}")
+                            elif final_height < FINAL_HEIGHT:
+                                self.logger.info(f"微调上升 {int(height_error)}cm")
+                                try:
+                                    move_distance = min(15, int(height_error))
+                                    self.controller.move_up(move_distance)
+                                    time.sleep(1)
+                                except Exception as adjust_error:
+                                    self.logger.warning(f"微调上升失败: {adjust_error}")
+                        else:
+                            if height_error <= 5:
+                                self.logger.info(f"高度精度达标，偏差仅{height_error}cm")
                 else:
-                    # 小距离：直接移动
-                    self.logger.info(f"小距离下降: {actual_descent}cm")
-                    try:
-                        self.controller.move_down(int(actual_descent))
-                        time.sleep(2)
-                    except Exception as small_error:
-                        self.logger.warning(f"小距离下降失败: {small_error}, 改用RC")
-                        self._rc_move_down(actual_descent)
+                    self.logger.info(f"距离太小({actual_descent}cm)，跳过下降")
                         
             except Exception as e:
-                self.logger.error(f"下降控制失败: {e}")
-                # 最后的紧急方案
-                self.logger.info("使用紧急RC下降...")
+                self.logger.error(f"RC下降控制失败: {e}")
+                # 备用方案：尝试小步长移动
+                self.logger.info("尝试备用下降方案...")
                 try:
-                    self._rc_move_down(70)  # 默认下降距离
-                except:
-                    pass
+                    current_height = self.get_current_height() or TARGET_HEIGHT
+                    remaining = current_height - FINAL_HEIGHT
+                    if remaining > 10:
+                        # 尝试一次小距离移动
+                        move_distance = min(20, int(remaining))
+                        self.logger.info(f"备用方案：下降 {move_distance}cm")
+                        self.controller.move_down(move_distance)
+                        time.sleep(2)
+                except Exception as backup_error:
+                    self.logger.warning(f"备用下降方案也失败: {backup_error}")
             
             # 验证最终高度
             final_height = self.get_current_height()
