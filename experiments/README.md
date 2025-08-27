@@ -69,8 +69,19 @@
 
 #### 数据记录
 - **飞行数据**: 自动保存到 `../data/flight_records/` 目录
-- **格式**: CSV文件，包含时间戳、位置、姿态、速度、加速度等
+- **格式**: CSV文件，包含时间戳、高度、姿态、速度、加速度等数据
 - **频率**: 50Hz高频采样
+- **数据列说明**:
+  - `timestamp`: 绝对时间戳 (ISO格式)
+  - `relative_time`: 相对实验开始的时间(秒)，便于数据分析
+  - `height_cm`: 无人机高度(厘米) - 核心实验数据
+  - `battery_percent`: 电池电量百分比
+  - `temperature_deg`: 温度(摄氏度)
+  - `pitch_deg`, `roll_deg`, `yaw_deg`: 姿态角度(度)
+  - `tof_distance_cm`: TOF距离传感器读数(厘米)
+  - `barometer_cm`: 气压计高度(厘米)
+  - `vgx_cm_s`, `vgy_cm_s`, `vgz_cm_s`: 三轴速度分量(厘米/秒)
+  - `agx_0001g`, `agy_0001g`, `agz_0001g`: 三轴加速度分量(0.001g单位)
 
 #### 日志文件  
 - **程序日志**: 保存到 `../logs/` 目录
@@ -150,11 +161,33 @@ import matplotlib.pyplot as plt
 data = pd.read_csv('path_to_flight_record.csv')
 
 # 分析高度变化
-plt.figure(figsize=(12, 6))
-plt.plot(data['relative_time'], data['z_cm'])
+plt.figure(figsize=(12, 8))
+
+# 子图1: 高度变化
+plt.subplot(2, 1, 1)
+plt.plot(data['relative_time'], data['height_cm'], 'b-', linewidth=2)
 plt.xlabel('时间 (秒)')
 plt.ylabel('高度 (cm)')
-plt.title('高度控制实验 - 高度变化')
+plt.title('RoboMaster TT高度控制实验 - 高度变化')
+plt.grid(True)
+
+# 子图2: 速度分析
+plt.subplot(2, 1, 2)
+plt.plot(data['relative_time'], data['vgz_cm_s'], 'r-', linewidth=2)
+plt.xlabel('时间 (秒)')
+plt.ylabel('垂直速度 (cm/s)')
+plt.title('垂直速度变化')
+plt.grid(True)
+
+plt.tight_layout()
+plt.show()
+
+# 分析电池消耗
+plt.figure(figsize=(10, 6))
+plt.plot(data['relative_time'], data['battery_percent'], 'g-', linewidth=2)
+plt.xlabel('时间 (秒)')
+plt.ylabel('电池电量 (%)')
+plt.title('实验过程电池消耗')
 plt.grid(True)
 plt.show()
 ```

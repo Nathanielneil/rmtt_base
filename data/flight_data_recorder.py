@@ -22,13 +22,15 @@ class FlightDataRecorder:
         # CSV字段定义 - 专注核心飞行数据
         self.csv_headers = [
             'timestamp',          # 时间戳
-            'relative_time',      # 相对开始时间(秒)
-            'x_cm',              # X轴位置坐标(cm)
-            'y_cm',              # Y轴位置坐标(cm)
-            'z_cm',              # Z轴位置坐标(cm)
+            'relative_time',      # 相对实验开始时间(秒)
+            'height_cm',         # 高度(cm) - 主要数据
+            'battery_percent',    # 电池电量(%)
+            'temperature_deg',    # 温度(°C)
             'pitch_deg',         # 俯仰角(度)
             'roll_deg',          # 翻滚角(度)
             'yaw_deg',           # 偏航角(度)
+            'tof_distance_cm',   # TOF距离传感器(cm)
+            'barometer_cm',      # 气压计高度(cm)
             'vgx_cm_s',          # X轴速度分量(cm/s)
             'vgy_cm_s',          # Y轴速度分量(cm/s)  
             'vgz_cm_s',          # Z轴速度分量(cm/s)
@@ -141,52 +143,91 @@ class FlightDataRecorder:
             tello = self.connection_manager.get_tello()
             current_time = time.time()
             
-            # 获取完整状态字符串
-            state = tello.get_current_state()
-            
             data_row = []
             
             # 时间戳数据
             data_row.append(datetime.now().isoformat())
-            data_row.append(current_time - self.record_start_time)
+            data_row.append(round(current_time - self.record_start_time, 3))  # 相对时间(秒)，保留3位小数
             
-            # 位置坐标 (x, y, z) - 从状态字符串解析
+            # 高度数据 - 使用最可靠的高度传感器
             try:
-                if state and isinstance(state, str):
-                    position_data = self._parse_state_data(state, ['x', 'y', 'z'])
-                    data_row.extend(position_data)
-                else:
-                    data_row.extend([None, None, None])
+                height = tello.get_height()
+                data_row.append(height if height is not None else 0)
+            except Exception as e:
+                if self.data_points_recorded < 5:  # 只在开始时记录错误
+                    self.logger.warning(f"获取高度失败: {e}")
+                data_row.append(0)
+            
+            # 电池电量
+            try:
+                battery = tello.get_battery()
+                data_row.append(battery if battery is not None else 0)
             except:
-                data_row.extend([None, None, None])
+                data_row.append(0)
             
-            # 姿态角度 (pitch, roll, yaw)
+            # 温度
             try:
-                data_row.append(tello.get_pitch())
-                data_row.append(tello.get_roll())
-                data_row.append(tello.get_yaw())
+                temp = tello.get_temperature()
+                data_row.append(temp if temp is not None else 20)  # 默认室温
             except:
-                data_row.extend([None, None, None])
+                data_row.append(20)
             
-            # 速度分量 (vgx, vgy, vgz) - 从状态字符串解析
+            # 获取完整状态字符串并解析所有数据
             try:
+                state = tello.get_current_state()
                 if state and isinstance(state, str):
+                    # 仅在第一次记录时显示状态字符串示例
+                    if self.data_points_recorded == 0:
+                        self.logger.info(f"RoboMaster TT状态字符串示例: {state[:200]}...")
+                    
+                    # 解析姿态角度 (pitch, roll, yaw)
+                    attitude_data = self._parse_state_data(state, ['pitch', 'roll', 'yaw'])
+                    data_row.extend([val if val is not None else 0.0 for val in attitude_data])
+                    
+                    # 解析距离传感器数据 (TOF和气压计)
+                    sensor_data = self._parse_state_data(state, ['tof', 'baro'])
+                    data_row.extend([val if val is not None else 0 for val in sensor_data])
+                    
+                    # 解析速度分量 (vgx, vgy, vgz) - RoboMaster TT支持速度数据
                     velocity_data = self._parse_state_data(state, ['vgx', 'vgy', 'vgz'])
-                    data_row.extend(velocity_data)
-                else:
-                    data_row.extend([None, None, None])
-            except:
-                data_row.extend([None, None, None])
-            
-            # 加速度分量 (agx, agy, agz) - 从状态字符串解析
-            try:
-                if state and isinstance(state, str):
+                    data_row.extend([val if val is not None else 0.0 for val in velocity_data])
+                    
+                    # 解析加速度分量 (agx, agy, agz) - RoboMaster TT支持加速度数据
                     acceleration_data = self._parse_state_data(state, ['agx', 'agy', 'agz'])
-                    data_row.extend(acceleration_data)
+                    data_row.extend([val if val is not None else 0 for val in acceleration_data])
                 else:
-                    data_row.extend([None, None, None])
-            except:
-                data_row.extend([None, None, None])
+                    # 如果状态字符串无效，使用API调用尝试获取基础数据
+                    self.logger.warning("状态字符串无效，使用API调用获取基础数据")
+                    
+                    # 姿态角度 - 使用单独的API调用
+                    try:
+                        pitch = tello.get_pitch() or 0.0
+                        roll = tello.get_roll() or 0.0  
+                        yaw = tello.get_yaw() or 0.0
+                        data_row.extend([pitch, roll, yaw])
+                    except:
+                        data_row.extend([0.0, 0.0, 0.0])
+                    
+                    # 距离传感器
+                    try:
+                        tof = tello.get_distance_tof() or 0
+                        baro = tello.get_barometer() or 0
+                        data_row.extend([tof, baro])
+                    except:
+                        data_row.extend([0, 0])
+                    
+                    # 速度和加速度数据无法通过单独API获取，填充0
+                    data_row.extend([0.0, 0.0, 0.0])  # vgx, vgy, vgz
+                    data_row.extend([0, 0, 0])        # agx, agy, agz
+                    
+            except Exception as e:
+                if self.data_points_recorded < 5:
+                    self.logger.error(f"数据解析失败: {e}")
+                # 填充默认值确保数据完整性
+                data_row.extend([0.0, 0.0, 0.0])  # pitch, roll, yaw
+                data_row.extend([0, 0])           # tof, baro
+                data_row.extend([0.0, 0.0, 0.0])  # vgx, vgy, vgz
+                data_row.extend([0, 0, 0])        # agx, agy, agz
             
             return data_row
             
@@ -195,24 +236,46 @@ class FlightDataRecorder:
             return None
     
     def _parse_state_data(self, state_string, fields):
+        """解析RoboMaster TT状态字符串中的数据字段"""
         results = []
+        import re
+        
         for field in fields:
             try:
-                # 解析状态字符串，格式类似: "field:value;"
-                pattern = f"{field}:([^;]+)"
-                import re
-                match = re.search(pattern, state_string)
-                if match:
-                    value = match.group(1)
-                    # 尝试转换为数字
-                    try:
-                        results.append(float(value))
-                    except:
-                        results.append(value)
-                else:
-                    results.append(None)
-            except:
+                # RoboMaster TT状态字符串格式通常为: "field:value;"
+                # 支持多种可能的分隔符和格式
+                patterns = [
+                    f"{field}:([^;,\\s]+)",  # field:value; 或 field:value,
+                    f"{field}=([^;,\\s]+)",  # field=value; 或 field=value,
+                    f"{field}\\s+([^;,\\s]+)",  # field value
+                ]
+                
+                value = None
+                for pattern in patterns:
+                    match = re.search(pattern, state_string, re.IGNORECASE)
+                    if match:
+                        raw_value = match.group(1).strip()
+                        try:
+                            # 尝试转换为浮点数
+                            value = float(raw_value)
+                            break
+                        except ValueError:
+                            try:
+                                # 尝试转换为整数
+                                value = int(raw_value)
+                                break
+                            except ValueError:
+                                # 如果都失败，保留字符串值
+                                value = raw_value
+                                break
+                
+                results.append(value)
+                
+            except Exception as e:
+                if self.data_points_recorded < 3:  # 只在开始时记录解析错误
+                    self.logger.debug(f"解析字段 '{field}' 失败: {e}")
                 results.append(None)
+        
         return results
     
     def add_command_log(self, command, success=True, error_msg=""):
