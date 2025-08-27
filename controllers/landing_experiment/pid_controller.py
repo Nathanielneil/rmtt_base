@@ -29,7 +29,7 @@ class PIDController:
         self.kd_pos = np.zeros(3)    # 位置微分增益
         
         # 基本参数
-        self.quad_mass = 1.0         # 无人机质量
+        self.quad_mass = 0.087       # RMTT实际质量87g
         self.hov_percent = 0.5       # 悬停油门百分比
         self.max_tilt_angle = 10.0   # 最大倾斜角度
         self.max_thrust = 1.0        # 最大推力
@@ -47,7 +47,7 @@ class PIDController:
         """初始化控制器参数 - 对应C++的init函数"""
         
         # PID控制器参数 - 完全对应原始参数
-        self.quad_mass = params.get("quad_mass", 1.0)
+        self.quad_mass = params.get("quad_mass", 0.087)  # RMTT实际质量
         self.hov_percent = params.get("hov_percent", 0.5)
         
         # 位置控制参数

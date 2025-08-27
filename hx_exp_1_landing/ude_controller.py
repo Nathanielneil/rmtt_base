@@ -45,7 +45,7 @@ class UDE_Controller:
         """初始化函数 - 严格对应C++的init函数第200-224行"""
         
         # UDE控制器参数 - 严格对应C++参数读取
-        self.quad_mass = params.get("ude_gain/quad_mass", 1.0)
+        self.quad_mass = params.get("ude_gain/quad_mass", 0.087)  # RMTT实际质量
         self.hov_percent = params.get("ude_gain/hov_percent", 0.5)
         
         # 位置控制参数 - 严格对应C++逻辑第206-208行

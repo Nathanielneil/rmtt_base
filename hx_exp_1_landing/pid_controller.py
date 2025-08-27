@@ -48,7 +48,7 @@ class PID_Controller:
         """初始化函数 - 严格对应C++的init(ros::NodeHandle &nh)函数"""
         
         # PID控制器参数 - 完全对应C++参数读取
-        self.quad_mass = params.get("pid_gain/quad_mass", 1.0)
+        self.quad_mass = params.get("pid_gain/quad_mass", 0.087)  # RMTT实际质量
         self.hov_percent = params.get("pid_gain/hov_percent", 0.5)
         
         # 位置控制参数 - 严格对应C++逻辑

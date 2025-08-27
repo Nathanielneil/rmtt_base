@@ -43,7 +43,7 @@ landing_experiment/
 所有参数完全对应原始launch文件配置：
 
 ### 基本参数
-- `quad_mass`: 2.5 (无人机质量)
+- `quad_mass`: 0.087 (RMTT实际质量87g)
 - `hov_percent`: 0.5 (悬停油门百分比)
 
 ### ADRC参数 (来自论文表1)
@@ -100,7 +100,7 @@ adapter = RMTTAdapter(ControllerType.ADRC)
 
 # 初始化控制器
 params = {
-    "quad_mass": 2.5,
+    "quad_mass": 0.087,  # RMTT实际质量
     "hov_percent": 0.5,
     # ... 其他参数
 }

@@ -89,7 +89,7 @@ class ADRC_Controller:
         """初始化函数 - 严格对应C++的init函数第388-433行"""
         
         # 基本参数从参数字典读取 - 对应C++第390-392行
-        self.quad_mass = params.get("ameso_gain/quad_mass", 2.5)
+        self.quad_mass = params.get("ameso_gain/quad_mass", 0.087)  # RMTT实际质量
         self.hov_percent = params.get("ameso_gain/hov_percent", 0.5)
         
         # 滑模控制参数，来自论文表1 - 对应C++第394-402行
@@ -290,7 +290,7 @@ class ADRC_Controller:
             Thr_x1 = self.hov_percent
             Thr_y1 = self.quad_mass * 9.8
             Thr_x2 = 1.0
-            Thr_y2 = 2.5 * self.quad_mass * 9.8
+            Thr_y2 = 2.0 * self.quad_mass * 9.8  # 调整为2.0倍最大推力
             Thr_k = (Thr_y2 - Thr_y1) / (Thr_x2 - Thr_x1)
             Thr_b = Thr_y2 - Thr_k * Thr_x2
             self.u_att_[3] = (Thrust_des - Thr_b) / Thr_k

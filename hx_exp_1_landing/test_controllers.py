@@ -25,7 +25,7 @@ def test_controller_creation():
     # 测试参数（对应原始launch文件）
     params = {
         # PID参数
-        "pid_gain/quad_mass": 2.5,
+        "pid_gain/quad_mass": 0.087,  # RMTT实际质量87g
         "pid_gain/hov_percent": 0.5,
         "pid_gain/Kp_xy": 2.0,
         "pid_gain/Kp_z": 2.0,
@@ -38,7 +38,7 @@ def test_controller_creation():
         "pid_gain/pz_int_max": 0.5,
         
         # UDE参数
-        "ude_gain/quad_mass": 2.5,
+        "ude_gain/quad_mass": 0.087,  # RMTT实际质量87g
         "ude_gain/hov_percent": 0.5,
         "ude_gain/Kp_xy": 0.5,
         "ude_gain/Kp_z": 0.5,
@@ -50,7 +50,7 @@ def test_controller_creation():
         "ude_gain/pz_int_max": 1.0,
         
         # ADRC参数
-        "ameso_gain/quad_mass": 2.5,
+        "ameso_gain/quad_mass": 0.087,  # RMTT实际质量87g
         "ameso_gain/hov_percent": 0.5,
         "ameso_gain/k": 0.8,
         "ameso_gain/k1": -0.15,
@@ -159,13 +159,13 @@ def test_parameter_accuracy():
     pid, ude, adrc = controllers
     
     # 验证关键参数
-    print(f"PID quad_mass: {pid.quad_mass} (应为2.5)")
+    print(f"PID quad_mass: {pid.quad_mass} (应为0.087)")
     print(f"PID kp_pos: {pid.kp_pos} (应为[2.0, 2.0, 2.0])")
     
-    print(f"UDE quad_mass: {ude.quad_mass} (应为2.5)")
+    print(f"UDE quad_mass: {ude.quad_mass} (应为0.087)")
     print(f"UDE filter_param: {ude.filter_param} (应为1.0)")
     
-    print(f"ADRC quad_mass: {adrc.quad_mass} (应为2.5)")
+    print(f"ADRC quad_mass: {adrc.quad_mass} (应为0.087)")
     print(f"ADRC k: {adrc.k} (应为0.8)")
     print(f"ADRC c1: {adrc.c1} (应为1.5)")
     print(f"ADRC lambda_adapt: {adrc.lambda_adapt} (应为0.8)")

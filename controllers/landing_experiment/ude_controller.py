@@ -27,7 +27,7 @@ class UDEController:
         self.filter_param = 1.0  # T_ude滤波器参数
         
         # 基本参数
-        self.quad_mass = 1.0
+        self.quad_mass = 0.087  # RMTT实际质量87g
         self.hov_percent = 0.5
         self.max_tilt_angle = 20.0
         self.max_thrust = 1.0
@@ -45,7 +45,7 @@ class UDEController:
         """初始化控制器参数 - 完全对应C++的init函数"""
         
         # UDE控制器参数 - 完全对应原始参数
-        self.quad_mass = params.get("quad_mass", 1.0)
+        self.quad_mass = params.get("quad_mass", 0.087)  # RMTT实际质量
         self.hov_percent = params.get("hov_percent", 0.5)
         
         # 位置控制参数

@@ -51,7 +51,7 @@ class ADRCController:
         self.initialized = False
         
         # 基本参数 - 对应C++所有参数
-        self.quad_mass = 2.5        # 无人机质量
+        self.quad_mass = 0.087      # RMTT实际质量87g
         self.hov_percent = 0.5      # 悬停油门百分比
         self.max_tilt_angle = 10.0  # 最大倾斜角度
         self.max_thrust = 1.0       # 最大推力
@@ -97,7 +97,7 @@ class ADRCController:
         """初始化控制器参数 - 完全对应C++的init函数"""
         
         # 基本参数从参数字典读取 - 完全对应原始参数
-        self.quad_mass = params.get("quad_mass", 2.5)
+        self.quad_mass = params.get("quad_mass", 0.087)  # RMTT实际质量
         self.hov_percent = params.get("hov_percent", 0.5)
         
         # 滑模控制参数，来自论文表1
@@ -305,7 +305,7 @@ class ADRCController:
             Thr_x1 = self.hov_percent
             Thr_y1 = self.quad_mass * 9.8
             Thr_x2 = 1.0
-            Thr_y2 = 2.5 * self.quad_mass * 9.8
+            Thr_y2 = 2.0 * self.quad_mass * 9.8  # 调整为2.0倍最大推力
             Thr_k = (Thr_y2 - Thr_y1) / (Thr_x2 - Thr_x1)
             Thr_b = Thr_y2 - Thr_k * Thr_x2
             self.u_att[3] = (Thrust_des - Thr_b) / Thr_k

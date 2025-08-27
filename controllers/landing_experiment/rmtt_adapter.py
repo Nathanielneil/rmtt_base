@@ -50,7 +50,7 @@ class RMTTAdapter:
             self.controller = PIDController()
             # PID参数配置
             pid_params = {
-                "quad_mass": params.get("quad_mass", 1.0),
+                "quad_mass": params.get("quad_mass", 0.087),  # RMTT实际质量
                 "hov_percent": params.get("hov_percent", 0.5),
                 "Kp_xy": params.get("Kp_xy", 2.0),
                 "Kp_z": params.get("Kp_z", 2.0),
@@ -68,7 +68,7 @@ class RMTTAdapter:
             self.controller = UDEController()
             # UDE参数配置
             ude_params = {
-                "quad_mass": params.get("quad_mass", 1.0),
+                "quad_mass": params.get("quad_mass", 0.087),  # RMTT实际质量
                 "hov_percent": params.get("hov_percent", 0.5),
                 "Kp_xy": params.get("Kp_xy", 0.5),
                 "Kp_z": params.get("Kp_z", 0.5),
@@ -85,7 +85,7 @@ class RMTTAdapter:
             self.controller = ADRCController()
             # ADRC参数配置 - 完全对应launch文件参数
             adrc_params = {
-                "quad_mass": params.get("quad_mass", 2.5),
+                "quad_mass": params.get("quad_mass", 0.087),  # RMTT实际质量
                 "hov_percent": params.get("hov_percent", 0.5),
                 "k": params.get("k", 0.8),
                 "k1": params.get("k1", -0.15),

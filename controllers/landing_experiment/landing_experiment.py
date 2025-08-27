@@ -45,7 +45,7 @@ class LandingExperiment:
         
         # 控制参数 - 完全对应launch文件参数
         self.control_params = {
-            "quad_mass": 2.5,           # 无人机质量
+            "quad_mass": 0.087,         # RMTT实际质量87g
             "hov_percent": 0.5,         # 悬停油门百分比
             
             # 滑模控制参数，来自论文表1

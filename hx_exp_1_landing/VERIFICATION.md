@@ -11,7 +11,7 @@
 - **ADRC控制器**: ✅ 完全对应C++实现第459-676行
 
 ### 2. 参数一致性验证
-- **基本参数**: ✅ quad_mass=2.5, hov_percent=0.5
+- **基本参数**: ✅ quad_mass=0.087 (RMTT适配), hov_percent=0.5
 - **PID参数**: ✅ Kp_xy=2.0, Kv_xy=2.0, Kvi_xy=0.3
 - **UDE参数**: ✅ Kp_xy=0.5, Kd_xy=2.0, T_ude=1.0
 - **ADRC参数**: ✅ k=0.8, c1=1.5, c2=0.6, lambda=0.8, sigma=0.9
@@ -75,17 +75,15 @@ except ImportError:
 
 ## 🎯 实验参数匹配
 
-### 降落实验轨迹
+### 降落实验轨迹 (简化版)
 - 起飞高度: 1.0m
 - 起飞速度: 0.2m/s
-- 下降速度1: 0.3m/s (1.6m→1.0m)
-- 下降速度2: 0.2m/s (1.0m→0.5m) 
-- 着陆速度: 0.1m/s (0.5m→地面)
+- 降落速度: 0.1m/s (1.0m→地面)
 
 ### 控制参数严格对应
 ```yaml
 # 原始launch文件参数完全保持
-ameso_gain/quad_mass: 2.5
+ameso_gain/quad_mass: 0.087  # RMTT实际质量87g
 ameso_gain/hov_percent: 0.5
 ameso_gain/k: 0.8
 ameso_gain/k1: -0.15

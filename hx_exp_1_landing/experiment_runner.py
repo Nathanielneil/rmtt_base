@@ -47,17 +47,15 @@ class ExperimentRunner:
         self.controller = None
         self.controller_type = ControllerType.ADRC  # 默认使用ADRC
         
-        # 实验参数 - 严格对应launch文件
+        # 实验参数 - 修改为简化降落流程
         self.experiment_params = {
-            # 飞行轨迹参数 - 对应launch文件第8-13行
+            # 飞行轨迹参数 - 简化为起飞到1.0m，然后直接降落
             "takeoff_height": 1.0,      # 起飞高度1.0m
             "takeoff_speed": 0.2,       # 起飞速度0.2m/s  
-            "descend_speed_1": 0.3,     # 1.6m→1.0m下降速度
-            "descend_speed_2": 0.2,     # 1.0m→0.5m下降速度
-            "land_speed": 0.1,          # 0.5m→地面降落速度
+            "descend_speed": 0.1,       # 1.0m→地面直接降落速度0.1m/s
             
             # 控制器参数 - 严格对应launch文件第15-50行
-            "ameso_gain/quad_mass": 2.5,
+            "ameso_gain/quad_mass": 0.087,  # RMTT实际质量87g
             "ameso_gain/hov_percent": 0.5,
             
             # 滑模控制参数
@@ -97,7 +95,7 @@ class ExperimentRunner:
         # 添加PID和UDE特有参数
         self.experiment_params.update({
             # PID控制器参数
-            "pid_gain/quad_mass": 2.5,
+            "pid_gain/quad_mass": 0.087,   # RMTT实际质量87g
             "pid_gain/hov_percent": 0.5,
             "pid_gain/Kp_xy": 2.0,
             "pid_gain/Kp_z": 2.0,
@@ -110,7 +108,7 @@ class ExperimentRunner:
             "pid_gain/pz_int_max": 0.5,
             
             # UDE控制器参数
-            "ude_gain/quad_mass": 2.5,
+            "ude_gain/quad_mass": 0.087,   # RMTT实际质量87g
             "ude_gain/hov_percent": 0.5,
             "ude_gain/Kp_xy": 0.5,
             "ude_gain/Kp_z": 0.5,
@@ -184,12 +182,8 @@ class ExperimentRunner:
             if not self._phase_takeoff():
                 return False
                 
-            # 实验阶段2: 分段降落
+            # 实验阶段2: 直接降落
             if not self._phase_landing():
-                return False
-                
-            # 实验阶段3: 最终着陆
-            if not self._phase_final_landing():
                 return False
             
             self.logger.info("降落实验成功完成")
@@ -229,55 +223,32 @@ class ExperimentRunner:
             return False
     
     def _phase_landing(self) -> bool:
-        """分段降落阶段"""
-        self.logger.info("阶段2: 分段降落")
+        """直接降落阶段"""
+        self.logger.info("阶段2: 直接降落 (0.1m/s速度)")
         
         try:
-            # 降落段1: 1.0m → 0.5m
+            # 从1.0m直接降落到地面
             desired_state = DesiredState(
-                pos=np.array([0.0, 0.0, 0.5]),
-                vel=np.array([0.0, 0.0, -self.experiment_params["descend_speed_2"]]),
+                pos=np.array([0.0, 0.0, 0.1]),  # 目标到10cm低空
+                vel=np.array([0.0, 0.0, -self.experiment_params["descend_speed"]]),  # 0.1m/s下降
                 acc=np.array([0.0, 0.0, 0.0]),
                 yaw=0.0
             )
             
-            if not self._controlled_flight_to_target(desired_state, max_time=10.0, tolerance=0.05):
-                return False
-            
-            # 在0.5m高度悬停2秒
-            time.sleep(2)
-            self.logger.info("分段降落完成")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"分段降落失败: {e}")
-            return False
-    
-    def _phase_final_landing(self) -> bool:
-        """最终着陆阶段"""
-        self.logger.info("阶段3: 最终着陆")
-        
-        try:
-            # 缓慢降落到地面
-            desired_state = DesiredState(
-                pos=np.array([0.0, 0.0, 0.1]),  # 10cm低空
-                vel=np.array([0.0, 0.0, -self.experiment_params["land_speed"]]),
-                acc=np.array([0.0, 0.0, 0.0]),
-                yaw=0.0
-            )
-            
-            # 控制降落到低空
-            self._controlled_flight_to_target(desired_state, max_time=8.0, tolerance=0.05)
+            # 控制降落到低空 (从1.0m到0.1m需要9秒)
+            if not self._controlled_flight_to_target(desired_state, max_time=12.0, tolerance=0.05):
+                self.logger.warning("控制降落未完全到达目标高度，继续执行着陆")
             
             # 发送着陆指令
+            self.logger.info("执行最终着陆指令")
             self.tello.land()
             time.sleep(3)
             
-            self.logger.info("最终着陆完成")
+            self.logger.info("直接降落完成")
             return True
             
         except Exception as e:
-            self.logger.error(f"最终着陆失败: {e}")
+            self.logger.error(f"直接降落失败: {e}")
             return False
     
     def _controlled_flight_to_target(self, desired_state: DesiredState, max_time: float = 10.0, tolerance: float = 0.1) -> bool:
