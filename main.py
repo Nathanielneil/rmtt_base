@@ -15,6 +15,7 @@ from core.connection import ConnectionManager
 from core.tello_controller import TelloController
 from media.video_stream import VideoStreamHandler
 from media.media_saver import MediaSaver
+from data.flight_data_recorder import FlightDataRecorder
 from utils.logger import Logger
 from utils.exceptions import TelloConnectionError, TelloControlError
 
@@ -28,6 +29,7 @@ class TelloCommander:
         self.controller = None
         self.video_handler = None
         self.media_saver = MediaSaver()
+        self.flight_recorder = None
         self.running = True
         self.session_start_time = datetime.now()
         self.session_stats = {
@@ -130,6 +132,7 @@ class TelloCommander:
             self.connection_manager.connect()
             self.controller = TelloController(self.connection_manager)
             self.video_handler = VideoStreamHandler(self.connection_manager)
+            self.flight_recorder = FlightDataRecorder(self.connection_manager)
             self.logger.info("无人机控制系统已就绪")
             return True
         except Exception as e:
@@ -137,6 +140,8 @@ class TelloCommander:
             return False
     
     def disconnect(self):
+        if self.flight_recorder:
+            self.flight_recorder.stop_recording()
         if self.video_handler:
             self.video_handler.stop_stream()
         if self.controller and self.controller.in_flight:
@@ -198,6 +203,10 @@ class TelloCommander:
                     flight_start = time.time()
                     self.controller.takeoff()
                     self.session_stats['flight_start_time'] = flight_start
+                    # 自动开始飞行数据记录
+                    if self.flight_recorder:
+                        self.flight_recorder.start_recording()
+                        self.flight_recorder.add_command_log('takeoff', True)
             
             elif command == 'land':
                 if self.controller:
@@ -205,6 +214,10 @@ class TelloCommander:
                         flight_duration = int(time.time() - self.session_stats['flight_start_time'])
                         self.session_stats['flight_time'] += flight_duration
                     self.controller.land()
+                    # 停止飞行数据记录
+                    if self.flight_recorder:
+                        self.flight_recorder.add_command_log('land', True)
+                        self.flight_recorder.stop_recording()
             
             elif command == 'emergency':
                 if self.controller:
@@ -245,6 +258,10 @@ class TelloCommander:
             elif command == 'media':
                 self._show_media_info()
             
+            elif command == 'record_data':
+                action = args[0] if args else 'status'
+                self._handle_data_recording(action)
+            
             else:
                 print(f"{Fore.RED}未知命令: {command}{Style.RESET_ALL}")
                 
@@ -266,6 +283,9 @@ class TelloCommander:
         
         if direction in direction_map:
             direction_map[direction](distance)
+            # 记录移动命令
+            if self.flight_recorder:
+                self.flight_recorder.add_command_log(f'{direction} {distance}', True)
     
     def _rotate_drone(self, direction, angle):
         if not self.controller:
@@ -273,8 +293,12 @@ class TelloCommander:
         
         if direction == 'cw':
             self.controller.rotate_clockwise(angle)
+            if self.flight_recorder:
+                self.flight_recorder.add_command_log(f'cw {angle}', True)
         elif direction == 'ccw':
             self.controller.rotate_counter_clockwise(angle)
+            if self.flight_recorder:
+                self.flight_recorder.add_command_log(f'ccw {angle}', True)
     
     def _handle_stream(self, action):
         if not self.video_handler:
@@ -297,8 +321,46 @@ class TelloCommander:
     def _take_photo(self):
         if self.video_handler and self.video_handler.streaming:
             self.video_handler.capture_image()
+            if self.flight_recorder:
+                self.flight_recorder.add_command_log('photo', True)
         else:
             print(f"{Fore.YELLOW}请先启动视频流 (stream start){Style.RESET_ALL}")
+    
+    def _handle_data_recording(self, action):
+        if not self.flight_recorder:
+            print(f"{Fore.RED}数据记录器未初始化{Style.RESET_ALL}")
+            return
+        
+        if action == 'start':
+            session_name = input("输入会话名称 (可选，直接回车跳过): ").strip()
+            if session_name:
+                success = self.flight_recorder.start_recording(session_name)
+            else:
+                success = self.flight_recorder.start_recording()
+            
+            if success:
+                print(f"{Fore.GREEN}飞行数据记录已开始{Style.RESET_ALL}")
+            else:
+                print(f"{Fore.RED}启动数据记录失败{Style.RESET_ALL}")
+        
+        elif action == 'stop':
+            self.flight_recorder.stop_recording()
+            print(f"{Fore.GREEN}飞行数据记录已停止{Style.RESET_ALL}")
+        
+        elif action == 'status':
+            status = self.flight_recorder.get_recording_status()
+            if status['recording']:
+                print(f"{Fore.CYAN}=== 数据记录状态 ==={Style.RESET_ALL}")
+                print(f"记录中: 是")
+                print(f"记录时长: {status['duration']:.1f}秒")
+                print(f"数据点数: {status['data_points']}")
+                print(f"采样频率: {1/status['interval']:.1f}Hz")
+                print(f"文件路径: {status['file_path']}")
+            else:
+                print(f"{Fore.YELLOW}数据记录未启动{Style.RESET_ALL}")
+        
+        else:
+            print(f"{Fore.RED}未知操作: {action}，支持: start/stop/status{Style.RESET_ALL}")
     
     def _show_status(self):
         if self.controller:
@@ -353,20 +415,28 @@ class TelloCommander:
   photo               - 拍照 (自动计入统计)
   media               - 显示媒体文件统计
 
+{Fore.YELLOW}飞行数据记录:{Style.RESET_ALL}
+  record_data start   - 开始记录飞行数据 (50Hz频率)
+  record_data stop    - 停止记录飞行数据
+  record_data status  - 查看记录状态
+  注: 起飞时自动开始记录，降落时自动停止
+
 {Fore.YELLOW}自动保存功能:{Style.RESET_ALL}
   程序退出时自动执行:
-     - 停止进行中的录制
+     - 停止进行中的录制和数据记录
      - 创建媒体文件备份
      - 生成详细会话报告
      - 显示统计信息
 
 {Fore.YELLOW}示例:{Style.RESET_ALL}
-  takeoff             - 起飞
+  takeoff             - 起飞 (自动开始数据记录)
   stream start        - 开启视频流
-  record start        - 开始录制
+  record start        - 开始录制视频
   up 100              - 上升100cm
   photo               - 拍照
-  land                - 降落 (退出时自动保存所有数据)
+  record_data status  - 查看数据记录状态
+  land                - 降落 (自动停止数据记录)
+  quit                - 退出 (自动保存所有数据)
 """
         print(help_text)
 
