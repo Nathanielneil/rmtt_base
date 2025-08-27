@@ -67,7 +67,7 @@ hx_exp_1_landing/
 # 自适应模型参数
 "ameso_gain/lambda": 0.8,    # 自适应学习率
 "ameso_gain/sigma": 0.9,     # 收缩因子
-"ameso_gain/omega_star": 1.0, # 阈值参数
+"ameso_gain/omega_star": 0.02, # 阈值参数
 
 # 跟踪微分器参数
 "ameso_gain/t1": 0.02,       # TD时间常数1

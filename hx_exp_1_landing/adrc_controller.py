@@ -58,7 +58,7 @@ class ADRC_Controller:
         # 自适应模型参数 - 严格对应.h文件第141-146行定义
         self.lambda_adapt = 0.0      # double lambda_adapt; 自适应学习率
         self.sigma_adapt = 0.0       # double sigma_adapt; 收缩因子
-        self.omega_star = 0.0        # double omega_star; 阈值参数
+        self.omega_star = 0.02       # double omega_star; 阈值参数
         self.n_basis = 9             # static const int n_basis = 9; 基函数数量
         self.omega_hat = [0.0] * 9   # std::vector<double> omega_hat; 自适应权重参数
         
@@ -105,7 +105,7 @@ class ADRC_Controller:
         # 自适应模型参数，来自论文表1 - 对应C++第404-407行
         self.lambda_adapt = params.get("ameso_gain/lambda", 0.8)
         self.sigma_adapt = params.get("ameso_gain/sigma", 0.9)
-        self.omega_star = params.get("ameso_gain/omega_star", 1.0)
+        self.omega_star = params.get("ameso_gain/omega_star", 0.02)
         
         # 跟踪微分器参数，来自论文表1 - 对应C++第409-411行
         self.t1 = params.get("ameso_gain/t1", 0.02)

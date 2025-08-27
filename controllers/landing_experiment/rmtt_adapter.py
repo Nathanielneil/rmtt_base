@@ -97,7 +97,7 @@ class RMTTAdapter:
                 "gamma": params.get("gamma", 0.2),
                 "lambda": params.get("lambda", 0.8),
                 "sigma": params.get("sigma", 0.9),
-                "omega_star": params.get("omega_star", 1.0),  # 注意：launch文件中是1.0，不是0.02
+                "omega_star": params.get("omega_star", 0.02),
                 "t1": params.get("t1", 0.02),
                 "t2": params.get("t2", 0.04),
                 "l": params.get("l", 5.0),

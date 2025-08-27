@@ -62,7 +62,7 @@ def test_controller_creation():
         "ameso_gain/gamma": 0.2,
         "ameso_gain/lambda": 0.8,
         "ameso_gain/sigma": 0.9,
-        "ameso_gain/omega_star": 1.0,
+        "ameso_gain/omega_star": 0.02,
         "ameso_gain/t1": 0.02,
         "ameso_gain/t2": 0.04,
         "ameso_gain/l": 5.0,

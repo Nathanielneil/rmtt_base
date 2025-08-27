@@ -73,7 +73,7 @@ class ExperimentRunner:
             # 自适应模型参数
             "ameso_gain/lambda": 0.8,
             "ameso_gain/sigma": 0.9,
-            "ameso_gain/omega_star": 1.0,  # 注意：launch文件中是1.0不是0.02
+            "ameso_gain/omega_star": 0.02,
             
             # 跟踪微分器参数
             "ameso_gain/t1": 0.02,

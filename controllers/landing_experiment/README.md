@@ -53,7 +53,7 @@ landing_experiment/
 - `lambda_D`: 1.0 (积分参数)
 - `beta_max`: 1.0, `gamma`: 0.2 (指数参数)
 - `lambda`: 0.8, `sigma`: 0.9 (自适应参数)
-- `omega_star`: 1.0 (阈值参数)
+- `omega_star`: 0.02 (阈值参数)
 - `t1`: 0.02, `t2`: 0.04 (跟踪微分器)
 - `l`: 5.0 (ESO增益)
 

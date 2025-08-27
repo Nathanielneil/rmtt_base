@@ -61,7 +61,7 @@ class LandingExperiment:
             # 自适应模型参数，来自论文表1
             "lambda": 0.8,              # 自适应学习率
             "sigma": 0.9,               # 收缩因子
-            "omega_star": 1.0,          # 阈值参数 - 注意：launch文件中是1.0
+            "omega_star": 0.02,         # 阈值参数
             
             # 跟踪微分器参数，来自论文表1
             "t1": 0.02,                 # TD时间常数1
