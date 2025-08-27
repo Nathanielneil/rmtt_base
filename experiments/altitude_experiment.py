@@ -127,32 +127,58 @@ class AltitudeExperiment:
         try:
             cycle_start_time = time.time()
             
-            # 阶段1: 上升到目标高度
+            # 阶段1: 智能上升到目标高度
             self.logger.info(f"[周期 {cycle_num}] 阶段1: 上升到 {TARGET_HEIGHT}cm...")
             current_height = self.get_current_height()
             
             if current_height is not None:
+                self.logger.info(f"当前高度: {current_height}cm, 目标高度: {TARGET_HEIGHT}cm")
                 height_diff = TARGET_HEIGHT - current_height
+                
                 if abs(height_diff) > HEIGHT_TOLERANCE:  # 如果高度差超过容差
-                    # 分段移动以避免超过安全限制
-                    remaining_distance = int(abs(height_diff))
-                    max_single_move = 150  # 单次最大移动距离
-                    
-                    while remaining_distance > HEIGHT_TOLERANCE:
-                        move_distance = min(remaining_distance, max_single_move)
+                    if height_diff > 0:
+                        # 需要上升
+                        remaining_distance = int(height_diff)
+                        self.logger.info(f"需要上升 {remaining_distance}cm")
                         
-                        if height_diff > 0:
-                            self.controller.move_up(move_distance)
-                        else:
-                            self.controller.move_down(move_distance)
+                        # 分段移动以避免超过安全限制
+                        max_single_move = min(100, remaining_distance)  # 单次最大移动距离
                         
-                        remaining_distance -= move_distance
-                        time.sleep(STABILIZATION_TIME)  # 等待移动完成
-                        
-                        # 更新当前高度
-                        new_height = self.get_current_height()
-                        if new_height is not None:
-                            height_diff = TARGET_HEIGHT - new_height
+                        while remaining_distance > HEIGHT_TOLERANCE:
+                            move_distance = min(remaining_distance, max_single_move)
+                            
+                            try:
+                                self.logger.info(f"上升 {move_distance}cm...")
+                                self.controller.move_up(move_distance)
+                                remaining_distance -= move_distance
+                                time.sleep(STABILIZATION_TIME)
+                                
+                                # 更新当前高度
+                                new_height = self.get_current_height()
+                                if new_height is not None:
+                                    height_diff = TARGET_HEIGHT - new_height
+                                    self.logger.info(f"上升后高度: {new_height}cm")
+                                    if abs(height_diff) <= HEIGHT_TOLERANCE:
+                                        break
+                                else:
+                                    break
+                                    
+                            except Exception as move_error:
+                                self.logger.warning(f"上升移动失败: {move_error}")
+                                break
+                    else:
+                        # 当前高度已经超过目标，需要下降
+                        excess_height = int(abs(height_diff))
+                        self.logger.info(f"当前高度超过目标 {excess_height}cm，需要下降")
+                        try:
+                            self.controller.move_down(excess_height)
+                            time.sleep(STABILIZATION_TIME)
+                        except Exception as move_error:
+                            self.logger.warning(f"下降调整失败: {move_error}")
+                else:
+                    self.logger.info(f"高度已符合要求，高度差仅 {abs(height_diff)}cm")
+            else:
+                self.logger.warning("无法获取当前高度，跳过高度调整")
             
             # 阶段2: 悬停
             self.logger.info(f"[周期 {cycle_num}] 阶段2: 在 {TARGET_HEIGHT}cm 悬停 {HOVER_DURATION}秒...")
