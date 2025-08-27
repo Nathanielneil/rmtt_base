@@ -58,27 +58,27 @@ class ExperimentRunner:
             "ameso_gain/quad_mass": 0.087,  # RMTT实际质量87g
             "ameso_gain/hov_percent": 0.5,
             
-            # 滑模控制参数 - 保守设置提高稳定性
-            "ameso_gain/k": 0.5,        # 降低滑模增益
-            "ameso_gain/k1": -0.1,      # 减小反馈增益
-            "ameso_gain/k2": -2.0,      # 减小反馈增益
-            "ameso_gain/c1": 1.0,       # 降低滑模面系数
-            "ameso_gain/c2": 0.8,       # 增加滑模面系数提高稳定
-            "ameso_gain/lambda_D": 0.5,  # 降低积分参数
-            "ameso_gain/beta_max": 0.8,  # 降低最大指数值
-            "ameso_gain/gamma": 0.15,    # 降低指数参数
+            # 滑模控制参数 - 平衡稳定性与响应速度
+            "ameso_gain/k": 0.8,        # 适度提高滑模增益以改善跟踪性能
+            "ameso_gain/k1": -0.2,      # 适度增强反馈增益
+            "ameso_gain/k2": -2.5,      # 适度增强反馈增益
+            "ameso_gain/c1": 1.2,       # 适度提高滑模面系数
+            "ameso_gain/c2": 0.9,       # 保持滑模面系数平衡
+            "ameso_gain/lambda_D": 0.7,  # 适度提高积分参数
+            "ameso_gain/beta_max": 0.9,  # 适度提高最大指数值
+            "ameso_gain/gamma": 0.2,     # 适度提高指数参数
             
-            # 自适应模型参数 - 保守设置
-            "ameso_gain/lambda": 0.5,    # 降低学习率
-            "ameso_gain/sigma": 0.95,    # 增大收缩因子
-            "ameso_gain/omega_star": 0.01, # 降低阈值参数
+            # 自适应模型参数 - 平衡学习与稳定
+            "ameso_gain/lambda": 0.6,    # 适度提高学习率
+            "ameso_gain/sigma": 0.93,    # 适度调整收缩因子
+            "ameso_gain/omega_star": 0.02, # 设置为用户要求的值
             
-            # 跟踪微分器参数 - 增加滤波
-            "ameso_gain/t1": 0.05,      # 增加时间常数
-            "ameso_gain/t2": 0.08,      # 增加时间常数
+            # 跟踪微分器参数 - 平衡滤波与响应
+            "ameso_gain/t1": 0.04,      # 适度减小时间常数提高响应
+            "ameso_gain/t2": 0.06,      # 适度减小时间常数提高响应
             
-            # AMESO观测器参数 - 降低增益
-            "ameso_gain/l": 3.0,        # 降低ESO增益
+            # AMESO观测器参数 - 适度提高增益
+            "ameso_gain/l": 4.0,        # 适度提高ESO增益改善观测性能
             
             # PID参数
             "ameso_gain/kp": 2.0,
@@ -229,14 +229,14 @@ class ExperimentRunner:
         try:
             # 从1.0m直接降落到地面
             desired_state = DesiredState(
-                pos=np.array([0.0, 0.0, 0.1]),  # 目标到10cm低空
+                pos=np.array([0.0, 0.0, 0.2]),  # 目标到20cm低空 (更合理的着陆高度)
                 vel=np.array([0.0, 0.0, -self.experiment_params["descend_speed"]]),  # 0.1m/s下降
                 acc=np.array([0.0, 0.0, 0.0]),
                 yaw=0.0
             )
             
-            # 控制降落到低空 (从1.0m到0.1m需要9秒)
-            if not self._controlled_flight_to_target(desired_state, max_time=12.0, tolerance=0.05):
+            # 控制降落到低空 (从1.0m到0.2m需要8秒，给予充足时间)
+            if not self._controlled_flight_to_target(desired_state, max_time=15.0, tolerance=0.1):
                 self.logger.warning("控制降落未完全到达目标高度，继续执行着陆")
             
             # 发送着陆指令
