@@ -223,21 +223,37 @@ class ExperimentRunner:
             return False
     
     def _phase_landing(self) -> bool:
-        """直接降落阶段"""
+        """直接降落阶段 - 分段控制策略"""
         self.logger.info("阶段2: 直接降落 (0.1m/s速度)")
         
         try:
-            # 从1.0m直接降落到地面
-            desired_state = DesiredState(
-                pos=np.array([0.0, 0.0, 0.2]),  # 目标到20cm低空 (更合理的着陆高度)
+            # 分段降落策略：先降到中等高度，再降到低空
+            
+            # 第一段：降落到中等高度 (0.5m)
+            self.logger.info("降落第一段: 1.0m -> 0.5m")
+            mid_desired_state = DesiredState(
+                pos=np.array([0.0, 0.0, 0.5]),  # 中等高度
                 vel=np.array([0.0, 0.0, -self.experiment_params["descend_speed"]]),  # 0.1m/s下降
                 acc=np.array([0.0, 0.0, 0.0]),
                 yaw=0.0
             )
             
-            # 控制降落到低空 (从1.0m到0.2m需要8秒，给予充足时间)
-            if not self._controlled_flight_to_target(desired_state, max_time=15.0, tolerance=0.1):
-                self.logger.warning("控制降落未完全到达目标高度，继续执行着陆")
+            # 控制到中等高度 (5秒应该足够)
+            if not self._controlled_flight_to_target(mid_desired_state, max_time=8.0, tolerance=0.1):
+                self.logger.warning("第一段降落未完全收敛，继续第二段")
+            
+            # 第二段：从中等高度到低空 (0.3m)
+            self.logger.info("降落第二段: 0.5m -> 0.3m")  
+            low_desired_state = DesiredState(
+                pos=np.array([0.0, 0.0, 0.3]),  # 低空高度
+                vel=np.array([0.0, 0.0, -self.experiment_params["descend_speed"]]),  # 0.1m/s下降
+                acc=np.array([0.0, 0.0, 0.0]),
+                yaw=0.0
+            )
+            
+            # 控制到低空 (3秒应该足够)
+            if not self._controlled_flight_to_target(low_desired_state, max_time=5.0, tolerance=0.1):
+                self.logger.warning("第二段降落未完全收敛，直接着陆")
             
             # 发送着陆指令
             self.logger.info("执行最终着陆指令")
@@ -295,7 +311,9 @@ class ExperimentRunner:
                     return True
                 
                 # 打印控制状态（每2秒一次）
-                if int(time.time() - start_time) % 2 == 0:
+                elapsed_time = int(time.time() - start_time)
+                if elapsed_time % 2 == 0 and elapsed_time > 0:
+                    self.logger.info(f"控制进度: 时间{elapsed_time}s, 当前高度{current_state.pos[2]:.2f}m, 目标{desired_state.pos[2]:.2f}m, 误差{pos_error:.3f}m")
                     self.controller.printf_result()
                 
                 time.sleep(control_dt)
