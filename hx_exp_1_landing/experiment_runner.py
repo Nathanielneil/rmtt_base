@@ -19,7 +19,7 @@ from core.connection import ConnectionManager
 from utils.logger import Logger
 from data.flight_data_recorder import FlightDataRecorder
 
-from .data_structures import DesiredState, CurrentState, ControlOutput
+from .data_structures import DesiredState, CurrentState, ControlOutput, R
 from .pid_controller import PID_Controller
 from .ude_controller import UDE_Controller  
 from .adrc_controller import ADRC_Controller

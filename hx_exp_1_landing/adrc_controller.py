@@ -9,9 +9,7 @@ import time
 import logging
 import math
 from typing import Dict, Any, List
-from scipy.spatial.transform import Rotation as R
-
-from .data_structures import DesiredState, CurrentState, ControlOutput, sign, sat
+from .data_structures import DesiredState, CurrentState, ControlOutput, sign, sat, R
 
 
 class ADRC_Controller:

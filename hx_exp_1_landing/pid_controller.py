@@ -8,9 +8,7 @@ import numpy as np
 import time
 import logging
 from typing import Dict, Any
-from scipy.spatial.transform import Rotation as R
-
-from .data_structures import DesiredState, CurrentState, ControlOutput, sign, sat
+from .data_structures import DesiredState, CurrentState, ControlOutput, sign, sat, R
 
 
 class PID_Controller:
