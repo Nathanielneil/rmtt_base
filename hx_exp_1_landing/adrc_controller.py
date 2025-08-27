@@ -36,14 +36,14 @@ class ADRC_Controller:
         self.epsilon_n2_init = 0.0   # 初始标称速度误差
         self.method_choose = 1       # 油门方式选择 - 对应C++第377行
         
-        # 基本参数 - 严格对应.h文件第124-131行定义
-        self.quad_mass = 0.0         # double quad_mass; 无人机质量
-        self.hov_percent = 0.0       # double hov_percent; 悬停油门百分比
-        self.max_tilt_angle = 0.0    # double max_tilt_angle; 最大倾斜角度
-        self.max_thrust = 0.0        # double max_thrust; 最大推力
-        self.min_thrust = 0.0        # double min_thrust; 最小推力
-        self.int_max_xy = 0.0        # double int_max_xy; XY积分限制
-        self.int_max_z = 0.0         # double int_max_z; Z积分限制
+        # 基本参数 - 严格对应.h文件第124-131行定义（使用RMTT默认值）
+        self.quad_mass = 0.087       # RMTT实际质量87g - 防止除零
+        self.hov_percent = 0.5       # 悬停油门百分比
+        self.max_tilt_angle = 10.0   # 最大倾斜角度
+        self.max_thrust = 1.0        # 最大推力
+        self.min_thrust = 0.1        # 最小推力
+        self.int_max_xy = 0.5        # XY积分限制
+        self.int_max_z = 0.5         # Z积分限制
         
         # 滑模控制参数 - 严格对应.h文件第133-139行定义
         self.k = 0.0                 # double k; 滑模增益

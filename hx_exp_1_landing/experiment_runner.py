@@ -272,7 +272,19 @@ class ExperimentRunner:
                 roll_cmd = int(np.clip(control_output[0] * 180/np.pi * 2.5, -100, 100))
                 pitch_cmd = int(np.clip(control_output[1] * 180/np.pi * 2.5, -100, 100))
                 yaw_cmd = int(np.clip(control_output[2] * 180/np.pi * 2.5, -100, 100))
-                throttle_cmd = int(np.clip((control_output[3] - 0.5) * 200, -100, 100))
+                
+                # 推力转换 - RMTT适配修复
+                thrust = control_output[3]
+                if thrust >= 0.5:
+                    # 上升: 0.5-1.0 映射到 0-100
+                    throttle_cmd = int(np.clip((thrust - 0.5) * 200, 0, 100))
+                else:
+                    # 下降: 0.0-0.5 映射到 -100-0
+                    throttle_cmd = int(np.clip((thrust - 0.5) * 200, -100, 0))
+                
+                # 保证最小推力，防止坠毁
+                if throttle_cmd < 5 and thrust > 0.1:
+                    throttle_cmd = max(5, throttle_cmd)
                 
                 self.tello.send_rc_control(roll_cmd, pitch_cmd, throttle_cmd, yaw_cmd)
                 

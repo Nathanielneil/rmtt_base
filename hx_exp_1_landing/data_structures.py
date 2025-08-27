@@ -87,8 +87,19 @@ class ControlOutput:
         pitch_cmd = int(np.clip(self.pitch * 180 / np.pi * 2.5, -100, 100))
         yaw_cmd = int(np.clip(self.yaw * 180 / np.pi * 2.5, -100, 100))
         
-        # 推力转换为throttle (-100到100)
-        throttle_cmd = int(np.clip((self.thrust - 0.5) * 200, -100, 100))
+        # 推力转换为throttle (-100到100) - RMTT适配修复
+        # thrust: 0.0-1.0 范围，0.5为悬停点
+        # throttle: -100到+100，0为悬停点
+        if self.thrust >= 0.5:
+            # 上升: 0.5-1.0 映射到 0-100
+            throttle_cmd = int(np.clip((self.thrust - 0.5) * 200, 0, 100))
+        else:
+            # 下降: 0.0-0.5 映射到 -100-0
+            throttle_cmd = int(np.clip((self.thrust - 0.5) * 200, -100, 0))
+        
+        # 保证最小推力，防止坠毁
+        if throttle_cmd < 5 and self.thrust > 0.1:
+            throttle_cmd = max(5, throttle_cmd)  # 最小5%推力
         
         return roll_cmd, pitch_cmd, throttle_cmd, yaw_cmd
 

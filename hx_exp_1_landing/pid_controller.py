@@ -28,14 +28,14 @@ class PID_Controller:
         self.ki_pos = np.zeros(3)    # Eigen::Vector3d ki_pos; 位置积分增益  
         self.kd_pos = np.zeros(3)    # Eigen::Vector3d kd_pos; 位置微分增益
         
-        # 基本参数 - 严格对应.h文件定义
-        self.quad_mass = 0.0         # double quad_mass; 无人机质量
-        self.hov_percent = 0.0       # double hov_percent; 悬停油门百分比
-        self.max_tilt_angle = 0.0    # double max_tilt_angle; 最大倾斜角度
-        self.max_thrust = 0.0        # double max_thrust; 最大推力
-        self.min_thrust = 0.0        # double min_thrust; 最小推力
-        self.int_max_xy = 0.0        # double int_max_xy; XY积分限制
-        self.int_max_z = 0.0         # double int_max_z; Z积分限制
+        # 基本参数 - 严格对应.h文件定义（使用RMTT默认值）
+        self.quad_mass = 0.087       # RMTT实际质量87g - 防止除零
+        self.hov_percent = 0.5       # 悬停油门百分比
+        self.max_tilt_angle = 10.0   # 最大倾斜角度
+        self.max_thrust = 1.0        # 最大推力
+        self.min_thrust = 0.1        # 最小推力
+        self.int_max_xy = 0.5        # XY积分限制
+        self.int_max_z = 0.5         # Z积分限制
         
         # 内部状态变量 - 严格对应.h文件定义
         self.desired_state_ = None   # Desired_State desired_state_

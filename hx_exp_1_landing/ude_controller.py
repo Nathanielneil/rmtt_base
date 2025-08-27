@@ -26,14 +26,14 @@ class UDE_Controller:
         self.kd_pos = np.zeros(3)     # Eigen::Vector3d kd_pos
         self.filter_param = 0.0       # double filter_param; T_ude滤波器参数
         
-        # 基本参数 - 严格对应.h文件定义
-        self.quad_mass = 0.0          # double quad_mass
-        self.hov_percent = 0.0        # double hov_percent
-        self.max_tilt_angle = 0.0     # double max_tilt_angle
-        self.max_thrust = 0.0         # double max_thrust
-        self.min_thrust = 0.0         # double min_thrust
-        self.int_max_xy = 0.0         # double int_max_xy
-        self.int_max_z = 0.0          # double int_max_z
+        # 基本参数 - 严格对应.h文件定义（使用RMTT默认值）
+        self.quad_mass = 0.087        # RMTT实际质量87g - 防止除零
+        self.hov_percent = 0.5        # 悬停油门百分比
+        self.max_tilt_angle = 20.0    # 最大倾斜角度
+        self.max_thrust = 1.0         # 最大推力
+        self.min_thrust = 0.1         # 最小推力
+        self.int_max_xy = 1.0         # XY积分限制
+        self.int_max_z = 1.0          # Z积分限制
         
         # 内部状态变量 - 严格对应.h文件定义
         self.desired_state_ = None    # Desired_State desired_state_
